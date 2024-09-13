@@ -27,3 +27,5 @@ then run (or play button in IDE):
 ```bash
 python bot.py
 ```
+
+Enjoy!
