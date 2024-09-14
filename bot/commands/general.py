@@ -10,3 +10,8 @@ class General(commands.Cog):
     async def ping(self, interaction: discord.Interaction):
         latency = round(self.bot.latency * 1000)
         await interaction.response.send_message(f"Pong! Latency: {latency}ms")
+        
+    @app_commands.command(name="sync", description="Sync the bot's commands")
+    async def sync(self, interaction: discord.Interaction):
+        await self.bot.tree.sync()
+        await interaction.response.send_message("Commands synced!")
