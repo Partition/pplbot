@@ -1,7 +1,8 @@
 from discord.ext import commands
 import discord
 from bot.commands.general import General
-from bot.database import init_db
+from bot.models import Player, Team, Account, Transfer, Invite, Strike
+from bot.database import init_db, get_db
 import os
 from dotenv import load_dotenv
 
@@ -18,7 +19,6 @@ async def setup_bot():
         print(f'{bot.user} has connected to Discord!')
         await init_db()
         await bot.add_cog(General(bot))
-        await bot.tree.sync()
 
         # Send a message to a specific channel
         channel_id = int(os.getenv('BOT_READY_CHANNEL_ID'))  # Get channel ID from .env file
