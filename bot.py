@@ -1,17 +1,20 @@
 from discord.ext import commands
 import discord
-# Change these imports
 from cogs.general import General
 from cogs.admin import Admin
+from cogs.error_handler import ErrorHandler
 from database import init_db, get_db
 import os
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
+logging.basicConfig(level=logging.ERROR)
 
 async def setup_bot():
     intents = discord.Intents.default()
     intents.message_content = True
+    intents.guilds = True
 
     bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -21,6 +24,8 @@ async def setup_bot():
         await init_db()
         await bot.add_cog(General(bot))
         await bot.add_cog(Admin(bot))
+        await bot.add_cog(ErrorHandler(bot))  # Move this to the end
+        print("Cogs loaded")
         
         # Send a message to a specific channel
         channel_id = int(os.getenv('BOT_READY_CHANNEL_ID'))  # Get channel ID from .env file
