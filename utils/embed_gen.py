@@ -26,9 +26,9 @@ class EmbedGenerator:
         )
 
     @staticmethod
-    def warning_embed(title: str, description: str) -> discord.Embed:
+    def error_embed(title: str, description: str) -> discord.Embed:
         return discord.Embed(
             title=title,
             description=description,
-            color=discord.Color.gold()
+            color=discord.Color.dark_red()
         )
