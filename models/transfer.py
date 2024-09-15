@@ -1,12 +1,12 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
-from sqlalchemy.sql import func
-from sqlalchemy import select, relationship
+from sqlalchemy.sql import func, select
+from sqlalchemy import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from .base import Base
 from datetime import datetime
 
 class Transfer(Base):
-    __tablename__ = "transfers"
+    __tablename__ = "transfers_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     player_id = Column(Integer, ForeignKey("players.discord_id"))

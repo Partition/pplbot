@@ -1,21 +1,25 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, BigInteger, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from .base import Base
 from .team import Team
 
 class Player(Base):
-    __tablename__ = "players"
+    __tablename__ = "players_table"
 
-    discord_id = Column(Integer, primary_key=True)
-    team_id = Column(Integer, ForeignKey("teams.id"))
+    discord_id = Column(BigInteger, primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams_table.id"))
     registered_at = Column(DateTime, server_default=func.now())
     is_premium = Column(Boolean, default=False)
     bio = Column(String(100))
     role = Column(String(5))
-    team = relationship("Team", back_populates="players")
+
+    # Many-to-one relationship with Team
+    team = relationship("Team", back_populates="players", foreign_keys=[team_id])
+
+    # One-to-one relationship with captain (specific player as captain)
+    captained_team = relationship("Team", back_populates="captain", foreign_keys=[Team.captain_id], uselist=False)
 
     @property
     async def is_captain(self):
@@ -37,7 +41,7 @@ class Player(Base):
         await session.commit()
         return self
     
-    async def set_team_id(self, session: AsyncSession, team_id: int):
+    async def set_team_id(self, session: AsyncSession, team_id: str):
         self.team_id = team_id
         await session.commit()
         return self
