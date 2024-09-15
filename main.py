@@ -1,6 +1,6 @@
 import asyncio
-from bot.bot import setup_bot
-from bot.database import engine, Base
+from bot import setup_bot
+from database import engine, Base
 from dotenv import load_dotenv
 import os
 
