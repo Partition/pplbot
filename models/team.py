@@ -1,21 +1,25 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
-from sqlalchemy.orm import relationship, select
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, select
 from .base import Base
 
 class Team(Base):
-    __tablename__ = "teams"
+    __tablename__ = "teams_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True)
-    tag = Column(String(100))
-    captain_id = Column(Integer, ForeignKey("players.discord_id"))
+    tag = Column(String(5), unique=True)
+    captain_id = Column(BigInteger, ForeignKey("players_table.discord_id"), unique=True)
     created_at = Column(DateTime, server_default=func.now())
     tokens_available = Column(Integer)
     active = Column(Boolean, default=True)
-    players = relationship("Player", back_populates="team")
-    captain = relationship("Player", foreign_keys=[captain_id])
+
+    # One-to-many relationship with Player (players in a team)
+    players = relationship("Player", back_populates="team", foreign_keys="[Player.team_id]")
+
+    # One-to-one relationship with captain (specific player as captain)
+    captain = relationship("Player", back_populates="captained_team", foreign_keys=[captain_id], uselist=False)
 
     @classmethod
     async def create(cls, session: AsyncSession, name: str, tag: str, captain_id: int):
@@ -31,7 +35,7 @@ class Team(Base):
             team.active = False
             await session.commit()
 
-    # Fetchters
+    # Fetchers
     @classmethod
     async def fetch_from_id(cls, session: AsyncSession, team_id: int):
         team = await session.get(cls, team_id)

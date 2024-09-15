@@ -1,11 +1,12 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
-from sqlalchemy.orm import relationship, select
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import select
 from datetime import datetime, timezone
 from .base import Base
 
 class Strike(Base):
-    __tablename__ = "strikes"
+    __tablename__ = "strikes_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     issued_by_id = Column(Integer, ForeignKey("players.discord_id"))

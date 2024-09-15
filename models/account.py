@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 class Account(Base):
-    __tablename__ = "accounts"
+    __tablename__ = "accounts_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     player_id = Column(Integer, ForeignKey("players.discord_id"), nullable=False)

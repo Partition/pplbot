@@ -6,7 +6,7 @@ from .base import Base
 from datetime import datetime, timedelta
 
 class Invite(Base):
-    __tablename__ = "invites"
+    __tablename__ = "invites_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     inviter_id = Column(Integer, ForeignKey("players.discord_id"))
