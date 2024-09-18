@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger
 from sqlalchemy.sql import func, select
-from sqlalchemy import relationship
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from .base import Base
 from datetime import datetime
@@ -8,22 +8,24 @@ from datetime import datetime
 class Transfer(Base):
     __tablename__ = "transfers_table"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    player_id = Column(Integer, ForeignKey("players.discord_id"))
-    activity = Column(Boolean)
-    team_name = Column(String, ForeignKey("teams.name"))
-    team_id = Column(Integer, ForeignKey("teams.id"))
+    id = Column(Integer, primary_key=True)
+    player_id = Column(BigInteger, ForeignKey('players_table.discord_id'))
+    team_id = Column(Integer, ForeignKey('teams_table.id'))
+    transfer_type = Column(Integer)
     transfer_date = Column(DateTime, server_default=func.now())
 
     player = relationship("Player", back_populates="transfers")
     team = relationship("Team", back_populates="transfers")
     
-    
+    # 0: Player leave
+    # 1: Player join
+    # 2: Team created
+    # 3: Team disbanded
     @classmethod
-    async def create(cls, session: AsyncSession, player_id: int, team_id: int, team_name: str, activity: bool):
-        transfer = cls(player_id=player_id, team_id=team_id, team_name=team_name, activity=activity)
+    async def create(cls, session: AsyncSession, player_id: int, team_id: int, transfer_type: int):
+        transfer = cls(player_id=player_id, team_id=team_id, transfer_type=transfer_type)
         session.add(transfer)
-        await session.commit()
+        await session.flush()
         return transfer
     
     @classmethod

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Boolean, ForeignKey, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
@@ -9,15 +9,16 @@ class Invite(Base):
     __tablename__ = "invites_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    inviter_id = Column(Integer, ForeignKey("players.discord_id"))
-    invitee_id = Column(Integer, ForeignKey("players.discord_id"))
-    team_id = Column(Integer, ForeignKey("teams.id"))
+    inviter_id = Column(BigInteger, ForeignKey("players_table.discord_id"))
+    invitee_id = Column(BigInteger, ForeignKey("players_table.discord_id"))
+    team_id = Column(Integer, ForeignKey("teams_table.id"))
     created_at = Column(DateTime, server_default=func.now())
     approved = Column(Boolean)
-    approved_by = Column(Integer, ForeignKey("players.discord_id"))
+    approved_by = Column(Integer, ForeignKey("players_table.discord_id"))
     approved_at = Column(DateTime)
     expires_at = Column(DateTime)
     active = Column(Boolean, default=True) # False = declined, expired, not approved, True = active
+    
     inviter = relationship("Player", foreign_keys=[inviter_id], back_populates="invites_sent")
     invitee = relationship("Player", foreign_keys=[invitee_id], back_populates="invites_received")
     team = relationship("Team")
@@ -26,7 +27,7 @@ class Invite(Base):
     async def create(cls, session: AsyncSession, inviter_id: int, invitee_id: int, team_id: int, expires_at: datetime):
         invite = cls(inviter_id=inviter_id, invitee_id=invitee_id, team_id=team_id, expires_at=expires_at)
         session.add(invite)
-        await session.commit()
+        await session.flush()
         return invite
     
     @classmethod
@@ -34,7 +35,7 @@ class Invite(Base):
         invite = await session.get(cls, invite_id)
         if invite:
             invite.active = False
-            await session.commit()
+            await session.flush()
     
     @classmethod
     async def approve_status(cls, session: AsyncSession, invite_id: int, approval: bool):
@@ -47,7 +48,7 @@ class Invite(Base):
                 invite.approved_at = datetime.now()
             else:
                 invite.active = False
-            await session.commit()
+            await session.flush()
         return invite
     
     # Fetchters
