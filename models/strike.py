@@ -25,14 +25,14 @@ class Strike(Base):
     async def create_player_strike(cls, session: AsyncSession, issued_by_id: int, issued_for_id: int, reason: str, punishment: str, expires_at: datetime):
         strike = cls(issued_by_id=issued_by_id, issued_for_id=issued_for_id, reason=reason, punishment=punishment, expires_at=expires_at, is_team_strike=False)
         session.add(strike)
-        await session.commit()
+        await session.flush()
         return strike
 
     @classmethod
     async def create_team_strike(cls, session: AsyncSession, issued_by_id: int, issued_for_team_id: int, reason: str, punishment: str, expires_at: datetime):
         strike = cls(issued_by_id=issued_by_id, issued_for_team_id=issued_for_team_id, reason=reason, punishment=punishment, expires_at=expires_at, is_team_strike=True)
         session.add(strike)
-        await session.commit()
+        await session.flush()
         return strike
 
     @classmethod
