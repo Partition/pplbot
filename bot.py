@@ -2,6 +2,7 @@ from discord.ext import commands
 import discord
 from cogs.general import General
 from cogs.admin import Admin
+from cogs.team import TeamCog
 from cogs.error_handler import ErrorHandler
 from database import init_db, get_db
 import os
@@ -24,6 +25,7 @@ async def setup_bot():
         await init_db()
         await bot.add_cog(General(bot))
         await bot.add_cog(Admin(bot))
+        await bot.add_cog(TeamCog(bot))
         await bot.add_cog(ErrorHandler(bot))  # Move this to the end
         print("Cogs loaded")
         
