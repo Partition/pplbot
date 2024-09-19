@@ -3,8 +3,10 @@ import discord
 from cogs.general import General
 from cogs.admin import Admin
 from cogs.team import TeamCog
+from cogs.account import AccountCog
 from cogs.error_handler import ErrorHandler
 from database import init_db, get_db
+
 import os
 from dotenv import load_dotenv
 import logging
@@ -26,6 +28,7 @@ async def setup_bot():
         await bot.add_cog(General(bot))
         await bot.add_cog(Admin(bot))
         await bot.add_cog(TeamCog(bot))
+        await bot.add_cog(AccountCog(bot))
         await bot.add_cog(ErrorHandler(bot))  # Move this to the end
         print("Cogs loaded")
         
