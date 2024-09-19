@@ -2,7 +2,9 @@ from sqlalchemy import Table, Column, BigInteger, Integer, String, Boolean, Fore
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from .base import Base
+from .team import Team
 
 class PlayerAlreadyInTeam(Exception):
     pass
@@ -13,7 +15,6 @@ class PlayerDoesNotExist(Exception):
 class PlayerAlreadyExists(Exception):
     pass
 
-teams_table = Table('teams_table', Base.metadata, autoload_with=Base.metadata.bind)
 
 class Player(Base):
     #TODO: Perhaps remove setters and establish session wrappers and change attrs and commit
@@ -35,7 +36,8 @@ class Player(Base):
     invites_sent = relationship("Invite", foreign_keys="Invite.inviter_id", back_populates="inviter")
     invites_received = relationship("Invite", foreign_keys="Invite.invitee_id", back_populates="invitee")
     transfers = relationship("Transfer", back_populates="player")
-
+    accounts = relationship("Account", back_populates="player")
+    
     @property
     async def is_captain(self):
         if self.team is None:
@@ -56,17 +58,20 @@ class Player(Base):
     
     @classmethod
     async def create(cls, session: AsyncSession, discord_id: int, role: str):
-        new_player = cls(discord_id=discord_id, role=role)
-        session.add(new_player)
-        await session.flush()
-        return new_player
-    
+        try:
+            new_player = cls(discord_id=discord_id, role=role)
+            session.add(new_player)
+            await session.flush()
+            return new_player
+        except IntegrityError:
+            raise PlayerAlreadyExists(f"Player with discord ID {discord_id} already exists")
+
     # Fetchers
     @classmethod
     async def fetch_from_discord_id(cls, session: AsyncSession, discord_id: int) -> "Player":
         result = await session.get(cls, discord_id)
         if result is None:
-            raise PlayerDoesNotExist
+            raise PlayerDoesNotExist(f"Player with discord ID {discord_id} does not exist")
         return result
 
     @classmethod
@@ -76,7 +81,7 @@ class Player(Base):
     
     @classmethod
     async def fetch_all_from_team_name(cls, session: AsyncSession, team_name: str):
-        result = await session.execute(select(cls).join(teams_table).filter(teams_table.c.name == team_name))
+        result = await session.execute(select(cls).join(Team).filter(Team.c.name == team_name))
         return result.scalars().all()
     
     @classmethod
