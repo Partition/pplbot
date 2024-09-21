@@ -2,21 +2,19 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from models.player import Player, PlayerDoesNotExist
-from models.team import Team
-from models.invite import Invite
 from utils.embed_gen import EmbedGenerator
 from database import AsyncSessionLocal
-from datetime import datetime, timedelta
-from pulsefire.clients import RiotAPIClient
-from dotenv import load_dotenv
+from utils.views import ConfirmView
+from utils.util_funcs import get_account_info
+from models.account import Account
+from random import choice
+from enum import Enum
 
-import os
-
-load_dotenv()
+class LeagueServer(Enum):
+    EUNE = "eun1"
+    EUW = "euw1"
 
 @app_commands.guilds(911940380717617202)
-
-
 class AccountCog(commands.GroupCog, group_name="account", description="Account management commands"):
     def __init__(self, bot):
         self.bot = bot
@@ -34,12 +32,41 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
     
     
     @app_commands.command(name="add", description="Add an account to the database")
-    async def add(self, interaction: discord.Interaction, username: str, tag: str, server: str):
-        async with RiotAPIClient(default_headers={"X-Riot-Token": os.getenv("RIOT_API_KEY")}) as client: 
-            account = await client.get_account_v1_by_riot_id(region="europe", game_name=username, tag_line=tag)
-            puuid, game_name, tag_line = account["puuid"], account["gameName"], account["tagLine"]
-            summoner = await client.get_lol_summoner_v4_by_puuid(region="euw1", puuid=account["puuid"])
-            puuid, name, profile_icon_id = summoner["id"], summoner["name"], summoner["profileIconId"]
-            await interaction.response.send_message(f"Account added: \n{puuid}\n{name}\n{profile_icon_id}\n{game_name}\n{tag_line}")
-            
-            # Verifiy account ownership with profile icon id
+    @app_commands.describe(username="The username of the account", tag="The tag of the account", server="The server of the account")
+    async def add(self, interaction: discord.Interaction, username: str, tag: str, server: LeagueServer):
+        _, initial_summoner = await get_account_info(username, tag, server.value)
+        current_icon_id = initial_summoner["profileIconId"]
+        
+        # Get a random profile icon id that is not the current one
+        random_id = choice([i for i in range(0, 20) if i != current_icon_id])
+        url = f"https://ddragon.leagueoflegends.com/cdn/14.11.1/img/profileicon/{random_id}.png"
+        
+        view = ConfirmView()
+        await interaction.response.send_message(
+            view=view,
+            embed=EmbedGenerator.default_embed(title="Change account icon", description="Change the account's profile icon to the one shown to confirm ownership").set_thumbnail(url=url),
+            ephemeral=True
+        )
+        await view.wait()
+
+        if view.value is None or not view.value:
+            new_embed = EmbedGenerator.error_embed(title="Error", description="You must confirm to change the account icon")
+        else:
+            updated_account, updated_summoner = await get_account_info(username, tag, server.value)
+            if updated_summoner["profileIconId"] == random_id:
+                async with AsyncSessionLocal() as session:
+                    account = await Account.create(
+                        session = session,
+                        player_id = interaction.user.id,
+                        server = LeagueServer(server.value).name, # Convert the enum to the server name, useful for op.gg links
+                        puuid = updated_account["puuid"],
+                        summoner_name = updated_account["gameName"],
+                        summoner_tag = updated_account["tagLine"],
+                    )
+                    await session.commit()
+                new_embed = EmbedGenerator.success_embed(title="Success", description="Account successfully confirmed")
+            else:
+                new_embed = EmbedGenerator.error_embed(title="Error", description="Profile icon does not match")
+        
+        await interaction.edit_original_response(embed=new_embed, view=None)
+
