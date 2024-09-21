@@ -9,9 +9,9 @@ class Strike(Base):
     __tablename__ = "strikes_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    issued_by_id = Column(Integer, ForeignKey("players.discord_id"))
-    issued_for_id = Column(Integer, ForeignKey("players.discord_id"), nullable=True)
-    issued_for_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    issued_by_id = Column(Integer, ForeignKey("players_table.discord_id"))
+    issued_for_id = Column(Integer, ForeignKey("players_table.discord_id"), nullable=True)
+    issued_for_team_id = Column(Integer, ForeignKey("teams_table.id"), nullable=True)
     reason = Column(String)
     punishment = Column(String)
     expires_at = Column(DateTime)
