@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,21 +12,21 @@ class AccountDoesNotExist(Exception):
     pass
 
 class Account(Base):
-
-
     __tablename__ = "accounts_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    player_id = Column(Integer, ForeignKey("players.discord_id"), nullable=False)
+    player_id = Column(BigInteger, ForeignKey("players_table.discord_id"), nullable=False)
     server = Column(String, nullable=False)
     puuid = Column(String, nullable=False, unique=True)
+    summoner_name = Column(String, nullable=False)
+    summoner_tag = Column(String, nullable=False)
     added_at = Column(DateTime, server_default=func.now())
     player = relationship("Player", back_populates="accounts")
     
     @classmethod
-    async def create(cls, session: AsyncSession, player_id: int, server: str, puuid: str) -> "Account":
+    async def create(cls, session: AsyncSession, player_id: int, server: str, puuid: str, summoner_name: str, summoner_tag: str) -> "Account":
         try:
-            new_account = cls(player_id=player_id, server=server, puuid=puuid)
+            new_account = cls(player_id=player_id, server=server, puuid=puuid, summoner_name=summoner_name, summoner_tag=summoner_tag)
             session.add(new_account)
             await session.flush()
             return new_account

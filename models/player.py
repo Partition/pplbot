@@ -17,7 +17,6 @@ class PlayerAlreadyExists(Exception):
 
 
 class Player(Base):
-    #TODO: Perhaps remove setters and establish session wrappers and change attrs and commit
     __tablename__ = "players_table"
 
     discord_id = Column(BigInteger, primary_key=True, unique=True)
@@ -35,8 +34,10 @@ class Player(Base):
 
     invites_sent = relationship("Invite", foreign_keys="Invite.inviter_id", back_populates="inviter")
     invites_received = relationship("Invite", foreign_keys="Invite.invitee_id", back_populates="invitee")
+    strikes_issued = relationship("Strike", foreign_keys="Strike.issued_by_id", back_populates="issued_by")
+    strikes_received = relationship("Strike", foreign_keys="Strike.issued_for_id", back_populates="issued_for_player")
     transfers = relationship("Transfer", back_populates="player")
-    accounts = relationship("Account", back_populates="player")
+    accounts = relationship("Account", back_populates="player", foreign_keys="Account.player_id")
     
     @property
     async def is_captain(self):
