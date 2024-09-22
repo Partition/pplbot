@@ -25,12 +25,13 @@ class Account(Base):
     
     # Ranked info
     summoner_id = Column(String, nullable=False)
-    rank = Column(String)
     tier = Column(String)
+    rank = Column(String)
     league_points = Column(Integer)
     wins = Column(Integer)
     losses = Column(Integer)
     peak_tier = Column(String)
+    peak_rank = Column(String)
     peak_league_points = Column(Integer)
     peak_occurence = Column(DateTime)
     last_updated = Column(DateTime, server_default=func.now())
