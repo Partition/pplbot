@@ -67,6 +67,11 @@ class Player(Base):
         except IntegrityError:
             raise PlayerAlreadyExists(f"Player with discord ID {discord_id} already exists")
 
+    @classmethod
+    async def exists(cls, session: AsyncSession, discord_id: int) -> bool:
+        result = await session.get(cls, discord_id)
+        return result is not None
+    
     # Fetchers
     @classmethod
     async def fetch_from_discord_id(cls, session: AsyncSession, discord_id: int) -> "Player":

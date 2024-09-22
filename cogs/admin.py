@@ -15,12 +15,11 @@ class Admin(commands.Cog):
     """
     def __init__(self, bot):
         self.bot = bot
-        print("Admin cog loaded")  # Debug print
 
     @commands.command(name="sync", description="Sync the bot's commands")
     @commands.has_permissions(administrator=True)
     async def sync(self, ctx):
-        print("Sync command invoked")  # Debug print
+        print("Sync command invoked")
         await self.bot.tree.sync()
         await ctx.send("Commands synced!")
         
