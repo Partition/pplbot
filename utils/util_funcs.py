@@ -16,3 +16,11 @@ def get_solo_queue_data(ranked_data):
         return next(entry for entry in ranked_data if entry['queueType'] == 'RANKED_SOLO_5x5')
     except StopIteration:
         return None
+    
+async def get_account_info_from_puuid(puuid: str, server: str):
+    async with RiotAPIClient(default_headers={"X-Riot-Token": os.getenv("RIOT_API_KEY")}) as client:
+        account = await client.get_account_v1_by_puuid(region="europe", puuid=puuid)
+        summoner = await client.get_lol_summoner_v4_by_puuid(region=server, puuid=puuid)
+        ranked = await client.get_lol_league_v4_entries_by_summoner(region=server, summoner_id=summoner["id"])
+        return account, summoner, get_solo_queue_data(ranked)
+
