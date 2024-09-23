@@ -32,7 +32,7 @@ class Admin(commands.Cog):
     @app_commands.command(name="team_create", description="Create a new team")
     @app_commands.describe(name="The name of the team", tag="The tag of the team", captain="The captain of the team")
     @app_commands.guilds(911940380717617202)
-    async def create_team(self, interaction: discord.Interaction, name: str, tag: str, captain: discord.Member):
+    async def create_team(self, interaction: discord.Interaction, name: str, tag: str, captain: discord.Member, league: str = None):
         async with AsyncSessionLocal() as session:
             try:
                 player = await Player.fetch_from_discord_id(session, captain.id)
@@ -40,7 +40,7 @@ class Admin(commands.Cog):
                     await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is already in a team."))
                     return
                 
-                team = await Team.create(session, name, tag, player.discord_id)
+                team = await Team.create(session, name, tag, player.discord_id, league)
                 player.team_id = team.id
                 await Transfer.create(session, player.discord_id, team.id, transfer_type=2)
                 

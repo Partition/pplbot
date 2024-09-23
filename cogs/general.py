@@ -1,11 +1,15 @@
 from code import interact
 from dis import disco
+from enum import nonmember
+from logging import captureWarnings
+from math import trunc
 
 from discord.ext import commands
 from discord import app_commands
 import discord
 from utils.embed_gen import EmbedGenerator
-from models.player import Player
+from models.player import Player, PlayerDoesNotExist
+from models.team import Team
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from config import LANE_ROLES
@@ -71,11 +75,46 @@ class General(commands.Cog):
                 discord_id=interaction.user.id,
                 role=lane_role[0]
             )
-
+            await session.commit()
             await interaction.response.send_message(
                 embed=EmbedGenerator.success_embed(
                     title="Registration Successful",
                     description=f"Welcome, {interaction.user.name}! You have been registered."
                 )
             )
+
+    @app_commands.command(name="profile", description="View a profile")
+    @app_commands.guilds(911940380717617202)
+    async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
+        if member is None:
+            member=interaction.user
+        async with AsyncSessionLocal() as session:
+            try:
+                player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            except PlayerDoesNotExist:
+                pass #await <message>
+
+            team = await Team.fetch_by_player_discord_id(session, player.discord_id)
+            team_name = "None"
+            team_tag = "None"
+            captain_mention = "None"
+            if team:
+                team_name = team.name
+                captain = await Player.fetch_from_discord_id(session, team.captain_id)
+                captain_member = interaction.guild.get_member(captain.discord_id)
+                captain_mention = captain_member.mention
+                team_tag = team.tag
+
+        await interaction.response.send_message(
+            embed = EmbedGenerator.default_embed(
+                title=f"Profile - {member.name}",
+                description=f"**Discord: ** {member.mention}\n"
+                            f"**Role: ** {player.role}\n\n"
+                            f"**Team: ** {team_name}\n"
+                            f"**Team Captain: ** {captain_mention}\n"
+                            f"**Team Tag: ** {team_tag}\n"
+                            f"**Accounts: **"
+            )
+        )
+
 
