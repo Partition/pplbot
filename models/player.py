@@ -4,7 +4,7 @@ from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from .base import Base
-from .team import Team
+import models
 
 class PlayerAlreadyInTeam(Exception):
     pass
@@ -87,7 +87,7 @@ class Player(Base):
     
     @classmethod
     async def fetch_all_from_team_name(cls, session: AsyncSession, team_name: str):
-        result = await session.execute(select(cls).join(Team).filter(Team.c.name == team_name))
+        result = await session.execute(select(cls).join(models.Team).filter(models.Team.c.name == team_name))
         return result.scalars().all()
     
     @classmethod

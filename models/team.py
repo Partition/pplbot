@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger, or_
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger, or_, join
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
+import models
 from .base import Base
 
 class TeamAlreadyExists(Exception):
@@ -100,6 +101,13 @@ class Team(Base):
     async def fetch_all_from_league(cls, session: AsyncSession, league: str):
         teams = await session.execute(select(cls).where(cls.league == league))
         return teams.scalars().all()
-    
 
+    @classmethod
+    async def fetch_by_player_discord_id(cls, session: AsyncSession, discord_id: int):
+        result = await session.execute(
+            select(cls)
+            .join(models.Player, models.Player.team_id == cls.id)
+            .where(models.Player.discord_id == discord_id)
+        )
+        return result.scalars().first()
 
