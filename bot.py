@@ -15,9 +15,7 @@ load_dotenv()
 logging.basicConfig(level=logging.ERROR)
 
 async def setup_bot():
-    intents = discord.Intents.default()
-    intents.message_content = True
-    intents.guilds = True
+    intents = discord.Intents.all()
 
     bot = commands.Bot(command_prefix='!', intents=intents)
 
