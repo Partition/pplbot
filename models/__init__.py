@@ -1,10 +1,9 @@
-from .base import Base
-from .player import Player
-from .account import Account
-from .team import Team
-from .invite import Invite
-from .transfer import Transfer
-from .strike import Strike
+from models.player import Player
+from models.account import Account
+from models.team import Team
+from models.invite import Invite
+from models.transfer import Transfer
+from models.strike import Strike
 
 from sqlalchemy.orm import configure_mappers
 configure_mappers()
