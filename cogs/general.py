@@ -1,3 +1,6 @@
+from code import interact
+from dis import disco
+
 from discord.ext import commands
 from discord import app_commands
 import discord
@@ -6,6 +9,7 @@ from models.player import Player
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from config import LANE_ROLES
+from random import choice
 
 class General(commands.Cog):
     def __init__(self, bot):
@@ -16,7 +20,35 @@ class General(commands.Cog):
     async def ping(self, interaction: discord.Interaction):
         latency = round(self.bot.latency * 1000)
         await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Pong!", description=f"Latency: {latency}ms"))
-        
+
+    @app_commands.command(name="coinflip", description="Toss a coin")
+    @app_commands.guilds(911940380717617202)
+    async def coinflip(self, interaction: discord.Interaction):
+        flip = ["heads", "tails"]
+        result = choice(flip)
+        if interaction.user.id == 308587420713091073:
+           result = flip[0]
+        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Cling!", description=f"The result is **{result}**"))
+
+    @app_commands.command(name="roles", description="List the available server roles")
+    @app_commands.guilds(911940380717617202)
+    async def roles(self, interaction: discord.Interaction):
+        unsorted_roles = list(interaction.guild.roles)
+        role_names = list()
+        for item in unsorted_roles:
+            role_names.append(item.name)
+        role_names.sort()
+        role_list = "\n".join(role_names)
+        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Roles", description=f"{role_list}"))
+
+    @app_commands.command(name="randrole", description="go crazy go stupid")
+    @app_commands.guilds(911940380717617202)
+    async def randrole(self, interaction: discord.Interaction):
+        lolrole = choice(interaction.guild.roles)
+        print(lolrole)
+        await interaction.user.add_roles(lolrole, atomic = True)
+        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Poof!", description=f"You are now **{lolrole}**"))
+
     @app_commands.command(name="register", description="Register to the database")
     @app_commands.guilds(911940380717617202)
     async def register(self, interaction: discord.Interaction):
