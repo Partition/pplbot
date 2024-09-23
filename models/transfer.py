@@ -2,8 +2,8 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, B
 from sqlalchemy.sql import func, select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
-from .base import Base
 from datetime import datetime
+from .base import Base
 
 class Transfer(Base):
     __tablename__ = "transfers_table"
