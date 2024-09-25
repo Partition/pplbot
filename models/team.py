@@ -65,9 +65,10 @@ class Team(Base):
 
     
     @classmethod
-    async def delete(cls, session: AsyncSession, team_id: int):
+    async def archive(cls, session: AsyncSession, team_id: int):
         team = await session.get(cls, team_id)
         if team:
+            team.captain_id = None
             team.active = False
             await session.flush()
 

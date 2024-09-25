@@ -67,8 +67,6 @@ class Account(Base):
     @classmethod
     async def fetch_from_puuid(cls, session: AsyncSession, puuid: str) -> "Account":
         result = await session.get(cls, puuid)
-        if result is None:
-            raise AccountDoesNotExist(f"Account with PUUID {puuid} does not exist")
         return result
     
     @classmethod

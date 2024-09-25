@@ -76,8 +76,6 @@ class Player(Base):
     @classmethod
     async def fetch_from_discord_id(cls, session: AsyncSession, discord_id: int) -> "Player":
         result = await session.get(cls, discord_id)
-        if result is None:
-            raise PlayerDoesNotExist(f"Player with discord ID {discord_id} does not exist")
         return result
 
     @classmethod
@@ -91,7 +89,7 @@ class Player(Base):
         return result.scalars().all()
     
     @classmethod
-    async def fetch_all(cls, session):
+    async def fetch_all(cls, session: AsyncSession):
         result = await session.execute(select(cls))
         return result.scalars().all()
     
