@@ -3,12 +3,13 @@ from discord.ext import commands
 from discord import app_commands
 from database import AsyncSessionLocal
 from models.team import Team
-from models.player import Player, PlayerDoesNotExist
+from models.player import Player
 from models.transfer import Transfer
 from models.team import TeamNameAlreadyExists, TeamTagAlreadyExists
 from utils.embed_gen import EmbedGenerator
+from utils.views import ConfirmView
 
-
+@app_commands.guilds(911940380717617202)
 class Admin(commands.Cog):
     """
     Admin commands
@@ -16,43 +17,129 @@ class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Interaction check to ensure user is registered
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        async with AsyncSessionLocal() as session:
+            if not await Player.exists(session, interaction.user.id):
+                return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not registered, please use the /register command"), ephemeral=True)
+        return True
+    
     @commands.command(name="sync", description="Sync the bot's commands")
     @commands.has_permissions(administrator=True)
     async def sync(self, ctx):
         print("Sync command invoked")
-        await self.bot.tree.sync()
-        await ctx.send("Commands synced!")
+        cmds = await self.bot.tree.sync()
+        await ctx.send(f"Commands synced! {len(cmds)} commands synced.")
         
     @commands.command(name="gsync", description="Sync the bot's commands to a specific guild")
     async def guildsync(self, ctx, guild_id: int):
         guild = discord.Object(id=guild_id)
-        await self.bot.tree.sync(guild=guild)
-        await ctx.send("Commands synced to guild!")
+        cmds = await self.bot.tree.sync(guild=guild)
+        await ctx.send(f"Commands synced! {len(cmds)} commands synced.")
     
-    @app_commands.command(name="team_create", description="Create a new team")
-    @app_commands.describe(name="The name of the team", tag="The tag of the team", captain="The captain of the team")
+    @app_commands.command(name="create_team", description="Create a new team")
+    @app_commands.describe(name="The name of the team", tag="The tag of the team", captain="The captain of the team", league="The league of the team")
     @app_commands.guilds(911940380717617202)
-    async def create_team(self, interaction: discord.Interaction, name: str, tag: str, captain: discord.Member):
-        async with AsyncSessionLocal() as session:
-            try:
+    async def create_team(self, interaction: discord.Interaction, name: str, tag: str, captain: discord.Member, league: str = None):
+        try:
+            async with AsyncSessionLocal() as session:
                 player = await Player.fetch_from_discord_id(session, captain.id)
+                if not player:
+                    return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player does not exist."))
                 if player.team_id:
-                    await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is already in a team."))
-                    return
+                    return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is already in a team."))
                 
-                team = await Team.create(session, name, tag, player.discord_id)
+                team = await Team.create(session, name, tag, player.discord_id, league)
                 player.team_id = team.id
                 await Transfer.create(session, player.discord_id, team.id, transfer_type=2)
-                
                 await session.commit()
-                await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Created", description=f"Successfully created team {name} ({tag})."))
+                
+            # Role and channel creation
+            new_team_role = await interaction.guild.create_role(name=name, hoist=True, mentionable=True, reason="Team created by " + interaction.user.name)
+            await interaction.user.add_roles(new_team_role)
             
-            except PlayerDoesNotExist:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be registered to use this command."))
-            except TeamNameAlreadyExists:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"A team with the name '{name}' already exists."))
-            except TeamTagAlreadyExists:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"A team with the tag '{tag}' already exists."))
-            except Exception as e:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"An unexpected error occurred: {str(e)}"))
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Created", description=f"Successfully created team {name} ({tag})."))
+        except TeamNameAlreadyExists:
+            await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"A team with the name '{name}' already exists."))
+        except TeamTagAlreadyExists:
+            await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"A team with the tag '{tag}' already exists."))
+        except Exception as e:
+            await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"An unexpected error occurred: {str(e)}"))
 
+    @app_commands.command(name="create_channels", description="Create all team channels and category")
+    @app_commands.describe(team_tag="The tag of the team")
+    @app_commands.guilds(911940380717617202)
+    async def create_channels(self, interaction: discord.Interaction, team_tag: str):
+        async with AsyncSessionLocal() as session:
+            team = await Team.fetch_from_tag(session, team_tag)
+            if not team:
+                return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"Team with tag '{team_tag}' does not exist."))
+        
+        role = discord.utils.get(interaction.guild.roles, name=team.name)
+        if not role:
+            return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"Role '{team.name}' does not exist."))
+        
+        category_channel = discord.utils.get(interaction.guild.categories, name=team.name)
+        if category_channel:
+            return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"Category channel '{team.name}' already exists."))
+        
+        text_overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            role: discord.PermissionOverwrite(read_messages=True),
+        }
+        voice_overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(connect=False),
+            role: discord.PermissionOverwrite(connect=True),
+        }
+        
+        category_channel = await interaction.guild.create_category(name=team.name, reason="Team category created by " + interaction.user.name)
+        team_text_channel = await interaction.guild.create_text_channel(name=team.name, category=category_channel, overwrites=text_overwrites, reason="Team chat created by " + interaction.user.name)
+        team_voice_channel = await interaction.guild.create_voice_channel(name=team.name, category=category_channel, overwrites=voice_overwrites, reason="Team voice channel created by " + interaction.user.name)
+        await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Channels Created", description=f"Successfully created channels for team {team.name}."))
+    
+    @app_commands.command(name="archive_team", description="Archive a team")
+    @app_commands.describe(team_tag="The tag of the team")
+    @app_commands.guilds(911940380717617202)
+    async def archive_team(self, interaction: discord.Interaction, team_tag: str):
+        async with AsyncSessionLocal() as session:
+            team = await Team.fetch_from_tag(session, team_tag)
+            if not team:
+                return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"Team with tag '{team_tag}' does not exist."))
+            
+            # Confirm with the user
+            confirm_view = ConfirmView()
+            await interaction.response.send_message(
+                view=confirm_view,
+                embed=EmbedGenerator.default_embed(title="Archive Team", description=f"Are you sure you want to archive team {team.name} ({team_tag})? This action cannot be undone."),
+            )
+            
+            # Wait for user confirmation
+            await confirm_view.wait()
+            if confirm_view.value is None or not confirm_view.value:
+                return await interaction.edit_original_response(embed=EmbedGenerator.error_embed(title="Failed", description="Action cancelled by user."), view=None)
+            
+            # Delete all channels and role
+            role = discord.utils.get(interaction.guild.roles, name=team.name)
+            if role:
+                await role.delete()
+            
+            category_channel = discord.utils.get(interaction.guild.categories, name=team.name)
+            if category_channel:
+                await category_channel.delete()
+                
+            text_channel = discord.utils.get(interaction.guild.text_channels, name=team.name)
+            if text_channel:
+                await text_channel.delete()
+            
+            voice_channel = discord.utils.get(interaction.guild.voice_channels, name=team.name)
+            if voice_channel:
+                await voice_channel.delete()
+
+            await Team.archive(session, team.id)
+            await session.commit()
+            await interaction.edit_original_response(embed=EmbedGenerator.success_embed(title="Team Archived", description=f"Successfully archived team {team.name} ({team_tag}). All related channels have been deleted."),
+                                                     view=None)
+    
+    
+async def setup(bot):
+    await bot.add_cog(Admin(bot))
