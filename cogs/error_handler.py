@@ -41,3 +41,7 @@ class ErrorHandler(commands.Cog):
         
         await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=error_message), ephemeral=True)
         logging.error(f"Slash command error: {error}")
+        
+async def setup(bot):
+    await bot.add_cog(ErrorHandler(bot))
+

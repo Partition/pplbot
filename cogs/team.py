@@ -104,9 +104,10 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
             
-            await player.set_team_id(session, team.id)
+            player.team_id = team.id
             await Invite.approve_status(session, valid_invite.id, True)
             await Transfer.create(session, player.discord_id, team.id, team.name, True)
+            await session.commit()
             
             await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team_name}."))
 
@@ -236,3 +237,6 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 teams = await Team.fetch_all(session)
                 team_list = "\n".join([f"{team.name} ({team.tag})" for team in teams])
                 await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="All Teams", description=team_list))
+                
+async def setup(bot):
+    await bot.add_cog(TeamCog(bot))
