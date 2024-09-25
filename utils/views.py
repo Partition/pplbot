@@ -11,7 +11,7 @@ class ConfirmView(ui.View):
         self.value = True
         self.stop()
 
-    @ui.button(label='Cancel', style=ButtonStyle.grey)
+    @ui.button(label='Cancel', style=ButtonStyle.red)
     async def cancel(self, interaction: Interaction, button: Button):
         self.value = False
         self.stop()
