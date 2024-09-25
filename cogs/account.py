@@ -176,3 +176,6 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
             embed = EmbedGenerator.success_embed(title="Accounts Updated", description=f"Successfully updated {updated_count} out of {len(accounts)} accounts.")
         
         await interaction.followup.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(AccountCog(bot))
