@@ -2,13 +2,14 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from models.team import Team
-from models.player import Player, PlayerDoesNotExist
+from models.player import Player
 from models.invite import Invite
 from models.transfer import Transfer
 from database import AsyncSessionLocal
 from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
-
+from config import APPROVAL_REQUIRED, INVITE_CHANNEL
+from utils.views import ConfirmView, InviteApprovalView
 
 @app_commands.guilds(911940380717617202)
 class TeamCog(commands.GroupCog, group_name="team", description="Team management commands"):
@@ -19,9 +20,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
     # Interaction check to ensure user is registered
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         async with AsyncSessionLocal() as session:
-            try: 
-                player = await Player.fetch_from_discord_id(session, interaction.user.id)
-            except PlayerDoesNotExist:
+            if not await Player.exists(session, interaction.user.id):
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be registered to use this command."))
                 return False
         return True
@@ -29,11 +28,11 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
     @app_commands.command(name="invite", description="Invite a player to your team")
     async def invite(self, interaction: discord.Interaction, player: discord.Member):
         async with AsyncSessionLocal() as session:
-            try:
-                inviter = await Player.fetch_from_discord_id(session, interaction.user.id)
-                invitee = await Player.fetch_from_discord_id(session, player.id)
-            except PlayerDoesNotExist:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player not found."))
+            inviter = await Player.fetch_from_discord_id(session, interaction.user.id)
+            invitee = await Player.fetch_from_discord_id(session, player.id)
+            team = await Team.fetch_from_id(session, inviter.team_id)
+            if not invitee:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is not registered."))
                 return
             
             if not inviter.team_id:
@@ -44,17 +43,26 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is already in a team."))
                 return
             
-            team = await Team.fetch_from_id(session, inviter.team_id)
-            if team.captain_id != inviter.discord_id:
+            if not await inviter.is_captain:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Only the team captain can invite players."))
                 return
             
             expires_at = datetime.now() + timedelta(days=7)
-            invite = await Invite.create(session, inviter.discord_id, invitee.discord_id, team.id, expires_at)
-            # Invites will go through mod channel for approval (will be toggleable in config)
+            invite = await Invite.create(session, inviter.discord_id, invitee.discord_id, inviter.team_id, expires_at)
+            await session.commit()
             
-            
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Sent", description=f"Invited {player.display_name} to your team."))
+        # Invites will go through mod channel for approval (will be toggleable in config)
+        mod_invite_channel = self.bot.get_channel(INVITE_CHANNEL)
+        if APPROVAL_REQUIRED:
+            response_message = EmbedGenerator.default_embed(title="Invite Needs Approval", description=f"Your invitation of {player.display_name} to {team.name} needs approval. Please wait for approval.")
+            await interaction.response.send_message(embed=response_message)
+
+            approval_embed = EmbedGenerator.default_embed(title="Invite Approval", description=f"Team: {team.name}\nInviter: {interaction.user.mention}\nInvitee: {player.mention}\nExpires: {expires_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            view = InviteApprovalView(invite.id)
+            await mod_invite_channel.send(embed=approval_embed, view=view)
+        else:
+            response_message = EmbedGenerator.default_embed(title="Invite Sent", description=f"Invited {player.display_name} to your team.")
+            await interaction.response.send_message(embed=response_message)
 
     @app_commands.command(name="invites", description="List all pending invites for your team")
     async def invites(self, interaction: discord.Interaction):
