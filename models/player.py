@@ -15,6 +15,8 @@ class PlayerDoesNotExist(Exception):
 class PlayerAlreadyExists(Exception):
     pass
 
+class PlayerNotInTeam(Exception):
+    pass
 
 class Player(Base):
     __tablename__ = "players_table"
@@ -43,7 +45,6 @@ class Player(Base):
     async def is_captain(self):
         if self.team is None:
             return False
-        await self.team
         return self.team.captain_id == self.discord_id
     
     async def to_dict(self):
@@ -67,10 +68,22 @@ class Player(Base):
         except IntegrityError:
             raise PlayerAlreadyExists(f"Player with discord ID {discord_id} already exists")
 
+    async def add_to_team(self, session: AsyncSession, team_id: int):
+        if self.team_id is not None:
+            raise PlayerAlreadyInTeam(f"Player with discord ID {self.discord_id} is already in team {self.team_id}")
+        self.team_id = team_id
+        await session.flush()
+        
+    async def remove_from_team(self, session: AsyncSession, team_id: int):
+        if self.team_id != team_id:
+            raise PlayerNotInTeam(f"Player with discord ID {self.discord_id} is not in team {team_id}")
+        self.team_id = None
+        await session.flush()
+
     @classmethod
     async def exists(cls, session: AsyncSession, discord_id: int) -> bool:
         result = await session.get(cls, discord_id)
-        return result is not None
+        return result
     
     # Fetchers
     @classmethod
