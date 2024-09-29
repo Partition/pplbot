@@ -1,6 +1,10 @@
 from pulsefire.clients import RiotAPIClient
-import os
 from dotenv import load_dotenv
+from models.player import Player, PlayerAlreadyInTeam, PlayerNotInTeam
+from models.team import Team
+from sqlalchemy.ext.asyncio import AsyncSession
+import os
+import discord
 
 load_dotenv(override=True)
 
@@ -24,3 +28,25 @@ async def get_account_info_from_puuid(puuid: str, server: str):
         ranked = await client.get_lol_league_v4_entries_by_summoner(region=server, summoner_id=summoner["id"])
         return account, summoner, get_solo_queue_data(ranked)
 
+
+async def player_join_team(session: AsyncSession, guild: discord.Guild, player: Player, team: Team):
+    await player.add_to_team(session, team.id)
+    
+    member = await guild.get_member(player.discord_id)
+    if not member:
+        return False
+    
+    await member.add_roles(discord.utils.get(guild.roles, name=team.name))
+    await member.edit(nick=f"[{team.tag}] {member.display_name}")
+    return True
+
+async def player_leave_team(session: AsyncSession, guild: discord.Guild, player: Player, team: Team):
+    await player.remove_from_team(session, team.id)
+    
+    member = await guild.get_member(player.discord_id)
+    if not member:
+        return False
+    
+    await member.remove_roles(discord.utils.get(guild.roles, name=team.name))
+    await member.edit(nick=None)
+    return True

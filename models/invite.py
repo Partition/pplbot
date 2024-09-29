@@ -14,7 +14,7 @@ class Invite(Base):
     team_id = Column(Integer, ForeignKey("teams_table.id"))
     created_at = Column(DateTime, server_default=func.now())
     approved = Column(Boolean)
-    approved_by = Column(Integer, ForeignKey("players_table.discord_id"))
+    approved_by = Column(BigInteger, ForeignKey("players_table.discord_id"))
     approved_at = Column(DateTime)
     expires_at = Column(DateTime)
     active = Column(Boolean, default=True) # False = declined, expired, not approved, True = active
