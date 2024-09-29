@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from config import LANE_ROLES
 from random import choice
+from models.team import Team
 
 class General(commands.Cog):
     def __init__(self, bot):
@@ -75,13 +76,31 @@ class General(commands.Cog):
                 discord_id=interaction.user.id,
                 role=lane_role[0]
             )
-            await session.commit()
-            await interaction.response.send_message(
-                embed=EmbedGenerator.success_embed(
-                    title="Registration Successful",
-                    description=f"Welcome, {interaction.user.name}! You have been registered."
-                )
+            session.commit()
+       
+        
+        await interaction.response.send_message(
+            embed=EmbedGenerator.success_embed(
+                title="Registration Successful",
+                description=f"Welcome, {interaction.user.name}! You have been registered."
             )
+        )
+
+    @app_commands.command(name="team_check", description="Check your team")
+    @app_commands.guilds(911940380717617202)
+    async def team_check(self, interaction: discord.Interaction):
+        async with AsyncSessionLocal() as session:
+            team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
+        await interaction.response.send_message(
+            embed=EmbedGenerator.default_embed(
+                title="Your Team",
+                description=f"You are on the team {team.name}."
+            )
+        )
+
+async def setup(bot):
+    await bot.add_cog(General(bot))
+
 
     @app_commands.command(name="profile", description="View a profile")
     @app_commands.guilds(911940380717617202)
