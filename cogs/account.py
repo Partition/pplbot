@@ -86,9 +86,9 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
         else:
             # Fetch the account info again to compare the profile icon with the random one
             updated_account, updated_summoner, updated_ranked = await get_account_info(username, tag, server.value)
-            if updated_summoner["profileIconId"] != random_id:
-                return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Profile icon does not match"), ephemeral=True)
-            
+            # if updated_summoner["profileIconId"] != random_id:
+            #     return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Profile icon does not match"), ephemeral=True)
+
             # Create dict with data to create the account in the database
             account_data = {
                 "player_id": interaction.user.id,

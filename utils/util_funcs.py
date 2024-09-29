@@ -50,3 +50,12 @@ async def player_leave_team(session: AsyncSession, guild: discord.Guild, player:
     await member.remove_roles(discord.utils.get(guild.roles, name=team.name))
     await member.edit(nick=None)
     return True
+
+def get_multi_opgg(server: str, display_names: list):
+    multi_opgg_link = list()
+    for display_name in display_names:
+         multi_opgg_link.append(display_name.replace(" ","+").replace("#","%23"))
+    return f"https://www.op.gg/multisearch/{server}?summoners={"%2C".join(multi_opgg_link)}"
+
+def get_opgg(server: str, display_name: str):
+    return f"https://www.op.gg/summoners/{server}/{display_name.replace(" ", "+").replace("#","-")}"

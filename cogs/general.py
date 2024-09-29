@@ -1,12 +1,8 @@
-from code import interact
-from dis import disco
-from enum import nonmember
-from logging import captureWarnings
-from math import trunc
-
 from discord.ext import commands
 from discord import app_commands
 import discord
+
+from models import Account
 from utils.embed_gen import EmbedGenerator
 from models.player import Player, PlayerDoesNotExist
 from models.team import Team
@@ -14,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 from config import LANE_ROLES
 from random import choice
-from models.team import Team
+
+from utils.util_funcs import get_multi_opgg, get_opgg
+
 
 class General(commands.Cog):
     def __init__(self, bot):
@@ -31,28 +29,7 @@ class General(commands.Cog):
     async def coinflip(self, interaction: discord.Interaction):
         flip = ["heads", "tails"]
         result = choice(flip)
-        if interaction.user.id == 308587420713091073:
-           result = flip[0]
         await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Cling!", description=f"The result is **{result}**"))
-
-    @app_commands.command(name="roles", description="List the available server roles")
-    @app_commands.guilds(911940380717617202)
-    async def roles(self, interaction: discord.Interaction):
-        unsorted_roles = list(interaction.guild.roles)
-        role_names = list()
-        for item in unsorted_roles:
-            role_names.append(item.name)
-        role_names.sort()
-        role_list = "\n".join(role_names)
-        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Roles", description=f"{role_list}"))
-
-    @app_commands.command(name="randrole", description="go crazy go stupid")
-    @app_commands.guilds(911940380717617202)
-    async def randrole(self, interaction: discord.Interaction):
-        lolrole = choice(interaction.guild.roles)
-        print(lolrole)
-        await interaction.user.add_roles(lolrole, atomic = True)
-        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Poof!", description=f"You are now **{lolrole}**"))
 
     @app_commands.command(name="register", description="Register to the database")
     @app_commands.guilds(911940380717617202)
@@ -76,7 +53,7 @@ class General(commands.Cog):
                 discord_id=interaction.user.id,
                 role=lane_role[0]
             )
-            session.commit()
+            await session.commit()
        
         
         await interaction.response.send_message(
@@ -98,21 +75,16 @@ class General(commands.Cog):
             )
         )
 
-async def setup(bot):
-    await bot.add_cog(General(bot))
-
-
     @app_commands.command(name="profile", description="View a profile")
     @app_commands.guilds(911940380717617202)
     async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
         if member is None:
             member=interaction.user
         async with AsyncSessionLocal() as session:
-            try:
-                player = await Player.fetch_from_discord_id(session, interaction.user.id)
-                player_role = player.role
-            except PlayerDoesNotExist:
-                player_role = "None"
+            player = await Player.fetch_from_discord_id(session, member.id)
+            if not player:
+                return await interaction.response.send_message(embed=EmbedGenerator.default_embed(
+                    title=f"Profile - {member.name}",description="This player is not registered"))
 
             team = await Team.fetch_by_player_discord_id(session, player.discord_id)
             team_name = "None"
@@ -125,16 +97,31 @@ async def setup(bot):
                 captain_mention = captain_member.mention
                 team_tag = team.tag
 
-        await interaction.response.send_message(
-            embed = EmbedGenerator.default_embed(
-                title=f"Profile - {member.name}",
-                description=f"**Discord: ** {member.mention}\n"
-                            f"**Role: ** {player_role}\n\n"
-                            f"**Team: ** {team_name}\n"
-                            f"**Team Captain: ** {captain_mention}\n"
-                            f"**Team Tag: ** {team_tag}\n"
-                            f"**Accounts: **"
-            )
-        )
+            account_info = await Account.fetch_all_from_player_id(session, member.id)
+            accounts_east = list()
+            accounts_west = list()
+            for account in account_info:
+                if account.server == "EUNE":
+                    accounts_east.append(str(account))
+                else:
+                    accounts_west.append(str(account))
+
+        embed = EmbedGenerator.default_embed(
+            title=f"Profile - {member.name}",
+            description=f"**Discord: ** {member.mention}\n"
+                        f"**Role: ** {player.role}\n\n"
+                        f"**Team: ** {team_name}\n"
+                        f"**Team Captain: ** {captain_mention}\n"
+                        f"**Team Tag: ** {team_tag}\n")
+        if accounts_east:
+            embed.add_field(name="",value=f"**Europe East ([All]({get_multi_opgg("eune",accounts_east)}))**\n"\
+                                     f"{"\n".join(f"[{x}]({get_opgg("eune", x)})" for x in accounts_east)}", inline=True)
+        if accounts_west:
+            embed.add_field(name="",value=f"**Europe West ([All]({get_multi_opgg("euw",accounts_west)}))**\n"\
+                                     f"{"\n".join(f"[{x}]({get_opgg("euw", x)})" for x in accounts_west)}", inline=True)
+
+        await interaction.response.send_message(embed=embed)
 
 
+async def setup(bot):
+    await bot.add_cog(General(bot))

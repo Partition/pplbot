@@ -40,6 +40,10 @@ class Account(Base):
     # Misc info
     added_at = Column(DateTime, server_default=func.now())
     player = relationship("Player", back_populates="accounts")
+
+
+    def __str__(self):
+        return f"{self.summoner_name}#{self.summoner_tag}"
     
     @classmethod
     async def check_if_username_and_tag_exists(cls, session: AsyncSession, username: str, tag: str, server: str) -> bool:
