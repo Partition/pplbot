@@ -91,8 +91,9 @@ class General(commands.Cog):
         async with AsyncSessionLocal() as session:
             try:
                 player = await Player.fetch_from_discord_id(session, interaction.user.id)
+                player_role = player.role
             except PlayerDoesNotExist:
-                pass #await <message>
+                player_role = "None"
 
             team = await Team.fetch_by_player_discord_id(session, player.discord_id)
             team_name = "None"
@@ -109,7 +110,7 @@ class General(commands.Cog):
             embed = EmbedGenerator.default_embed(
                 title=f"Profile - {member.name}",
                 description=f"**Discord: ** {member.mention}\n"
-                            f"**Role: ** {player.role}\n\n"
+                            f"**Role: ** {player_role}\n\n"
                             f"**Team: ** {team_name}\n"
                             f"**Team Captain: ** {captain_mention}\n"
                             f"**Team Tag: ** {team_tag}\n"
