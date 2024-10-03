@@ -10,7 +10,7 @@ from config import REGISTERED_ROLE
 from random import choice
 from utils.enums import LeagueRole
 from utils.util_funcs import get_multi_opgg, get_opgg
-
+from utils.paginator import ButtonPaginator
 
 class General(commands.Cog):
     def __init__(self, bot):
@@ -115,6 +115,16 @@ class General(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="testpaginator", description="Test paginator")
+    @app_commands.guilds(911940380717617202)
+    async def testpaginator(self, interaction: discord.Interaction):
+        
+        # can iterate over Teams and create embeds for each team and append them to pages
+        pages = [EmbedGenerator.default_embed(title=f"Team A", description=f"Members: aaaa."),
+                 EmbedGenerator.default_embed(title=f"Team B", description=f"Members: bbbb.")]
+        paginator = ButtonPaginator(pages)
+        await paginator.start(interaction)
+        
 
 async def setup(bot):
     await bot.add_cog(General(bot))
