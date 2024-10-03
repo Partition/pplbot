@@ -49,7 +49,6 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             
             expires_at = datetime.now() + timedelta(days=7)
             invite = await Invite.create(session, inviter.discord_id, invitee.discord_id, inviter.team_id, expires_at)
-            await session.commit()
             
         # Invites will go through mod channel for approval (will be toggleable in config)
         mod_invite_channel = self.bot.get_channel(INVITE_CHANNEL)
@@ -61,8 +60,10 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             view = InviteApprovalView(invite.id)
             await mod_invite_channel.send(embed=approval_embed, view=view)
         else:
+            await Invite.approve_status(session, invite.id, True)
             response_message = EmbedGenerator.default_embed(title="Invite Sent", description=f"Invited {player.display_name} to your team.")
             await interaction.response.send_message(embed=response_message)
+        await session.commit()
 
     @app_commands.command(name="invites", description="List all pending invites for your team")
     async def invites(self, interaction: discord.Interaction):

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from .base import Base
 import models
-
+from typing import Optional
 class PlayerAlreadyInTeam(Exception):
     pass
 
@@ -24,6 +24,7 @@ class Player(Base):
     discord_id = Column(BigInteger, primary_key=True, unique=True)
     team_id = Column(Integer, ForeignKey("teams_table.id"))
     registered_at = Column(DateTime, server_default=func.now())
+    nickname = Column(String(32))
     is_premium = Column(Boolean, default=False)
     bio = Column(String(100))
     role = Column(String(5))
@@ -51,6 +52,7 @@ class Player(Base):
         return {
             "discord_id": self.discord_id,
             "team_id": self.team_id,
+            "nickname": self.nickname,
             "registered_at": self.registered_at.isoformat() if self.registered_at else None,
             "is_premium": self.is_premium,
             "bio": self.bio,
@@ -59,9 +61,9 @@ class Player(Base):
         }
     
     @classmethod
-    async def create(cls, session: AsyncSession, discord_id: int, role: str):
+    async def create(cls, session: AsyncSession, discord_id: int, role: str, nickname: str):
         try:
-            new_player = cls(discord_id=discord_id, role=role)
+            new_player = cls(discord_id=discord_id, role=role, nickname=nickname)
             session.add(new_player)
             await session.flush()
             return new_player
@@ -87,36 +89,36 @@ class Player(Base):
     
     # Fetchers
     @classmethod
-    async def fetch_from_discord_id(cls, session: AsyncSession, discord_id: int) -> "Player":
+    async def fetch_from_discord_id(cls, session: AsyncSession, discord_id: int) -> Optional["Player"]:
         result = await session.get(cls, discord_id)
         return result
 
     @classmethod
-    async def fetch_all_from_team_id(cls, session: AsyncSession, team_id: int):
+    async def fetch_all_from_team_id(cls, session: AsyncSession, team_id: int) -> list["Player"]:
         result = await session.execute(select(cls).filter(cls.team_id == team_id))
         return result.scalars().all()
     
     @classmethod
-    async def fetch_all_from_team_name(cls, session: AsyncSession, team_name: str):
+    async def fetch_all_from_team_name(cls, session: AsyncSession, team_name: str) -> list["Player"]:
         result = await session.execute(select(cls).join(models.Team).filter(models.Team.c.name == team_name))
         return result.scalars().all()
     
     @classmethod
-    async def fetch_all(cls, session: AsyncSession):
+    async def fetch_all(cls, session: AsyncSession) -> list["Player"]:
         result = await session.execute(select(cls))
         return result.scalars().all()
     
     @classmethod
-    async def fetch_all_premium(cls, session: AsyncSession):
+    async def fetch_all_premium(cls, session: AsyncSession) -> list["Player"]:
         result = await session.execute(select(cls).filter(cls.is_premium == True))
         return result.scalars().all()
     
     @classmethod
-    async def count_players(cls, session: AsyncSession):
+    async def count_players(cls, session: AsyncSession) -> int:
         result = await session.execute(select(func.count()).select_from(cls))
         return result.scalar_one()
 
     @classmethod
-    async def fetch_players_without_team(cls, session: AsyncSession):
+    async def fetch_players_without_team(cls, session: AsyncSession) -> list["Player"]:
         result = await session.execute(select(cls).filter(cls.team_id == None))
         return result.scalars().all()
