@@ -1,12 +1,14 @@
+from imghdr import tests
+
 from discord.ext import commands
 from discord import app_commands
 import discord
 from models import Account
 from utils.embed_gen import EmbedGenerator
-from models.player import Player, PlayerDoesNotExist
+from models.player import Player, PlayerDoesNotExist, PlayerAlreadyExists
 from models.team import Team
 from database import AsyncSessionLocal
-from config import REGISTERED_ROLE
+from config import REGISTERED_ROLE, NICKNAME_CHARACTER_LIMIT
 from random import choice
 from utils.enums import LeagueRole
 from utils.util_funcs import get_multi_opgg, get_opgg
@@ -32,29 +34,81 @@ class General(commands.Cog):
     @app_commands.command(name="register", description="Register to the database")
     @app_commands.describe(role="The role of the player", nickname="The nickname of the player")
     @app_commands.guilds(911940380717617202)
-    async def register(self, interaction: discord.Interaction, role: LeagueRole, nickname: str):     
+    async def register(self, interaction: discord.Interaction, role: LeagueRole, nickname: str = ""):
         async with AsyncSessionLocal() as session:
+            if await Player.exists(session, interaction.user.id):
+               return await interaction.response.send_message(
+                    embed=EmbedGenerator.error_embed(
+                        title="Registration Failed",
+                        description="You are already registered"
+                    )
+                )
+
+            if len(nickname) > NICKNAME_CHARACTER_LIMIT:
+               return await interaction.response.send_message(
+                    embed=EmbedGenerator.error_embed(
+                        title="Registration Failed",
+                        description=f"Your nickname cannot exceed 24 characters"
+                    )
+                )
             new_player = await Player.create(
                 session,
                 discord_id=interaction.user.id,
                 role=role.value,
-                nickname=nickname
+                nickname=interaction.user.nick if not nickname else nickname
             )
             await session.commit()
-               
-        league_role = discord.utils.get(interaction.guild.roles, name=role.value)
-        await interaction.user.add_roles(discord.Object(id=REGISTERED_ROLE), league_role)
         try:
-            await interaction.user.edit(nick=nickname)
+            league_role = discord.utils.get(interaction.guild.roles, name=role.value)
+            await interaction.user.add_roles(discord.Object(id=REGISTERED_ROLE), league_role)
+            if nickname:
+                await interaction.user.edit(nick=nickname)
+
         except discord.Forbidden:
-            pass
-        
+            return await interaction.response.send_message(
+                embed=EmbedGenerator.error_embed(
+                    title="kill yourself",
+                    description=f"Welcome, {new_player.nickname}! faggot."
+                )
+            )
+
         await interaction.response.send_message(
             embed=EmbedGenerator.success_embed(
                 title="Registration Successful",
-                description=f"Welcome, {interaction.user.name}! You have been registered."
+                description=f"Welcome, {new_player.nickname}! You have been registered."
             )
         )
+
+    @app_commands.command(name="nick", description="Change your nickname")
+    @app_commands.guilds(911940380717617202)
+    async def nick(self, interaction: discord.Interaction, nickname: str = ""):
+        async with AsyncSessionLocal() as session:
+            team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
+            team_tag = f"[{team.tag}] " if team else ""
+            player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            player.nickname = nickname
+            await session.commit()
+
+        try:
+            await interaction.user.edit(nick=f"{team_tag}{nickname if nickname else interaction.user.name}")
+        except discord.Forbidden:
+            pass
+
+        if nickname == "":
+            await interaction.response.send_message(
+                embed=EmbedGenerator.default_embed(
+                    title="Nickname Cleared",
+                    description=f"Your nickname has been cleared"
+                )
+            )
+
+        else:
+            await interaction.response.send_message(
+                embed=EmbedGenerator.default_embed(
+                    title="Nickname Changed",
+                    description=f"Your nickname is now **{team_tag}{nickname}**"
+                )
+            )
 
     @app_commands.command(name="team_check", description="Check your team")
     @app_commands.guilds(911940380717617202)
@@ -76,7 +130,7 @@ class General(commands.Cog):
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, member.id)
             if not player:
-                return await interaction.response.send_message(embed=EmbedGenerator.default_embed(
+                return await interaction.response.send_message(embed=EmbedGenerator.error_embed(
                     title=f"Profile - {member.name}",description="This player is not registered"))
 
             team = await Team.fetch_by_player_discord_id(session, player.discord_id)
