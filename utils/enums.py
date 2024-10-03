@@ -29,4 +29,9 @@ class LeagueRole(Enum):
     ADC = "ADC"
     SUPPORT = "Support"
 
-
+class TransferType(Enum):
+    PLAYER_JOIN = 1
+    PLAYER_LEAVE = 2
+    TEAM_CREATE = 3
+    TEAM_DISBAND = 4
+    

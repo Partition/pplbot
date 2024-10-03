@@ -76,4 +76,8 @@ class Invite(Base):
     async def fetch_active_invites_by_inviter(cls, session: AsyncSession, inviter_id: int):
         invites = await session.execute(select(cls).where(cls.inviter_id == inviter_id).where(cls.active == True))
         return invites.scalars().all()
-        
+    
+    @classmethod
+    async def fetch_active_invite_by_team_id_and_invitee(cls, session: AsyncSession, team_id: int, invitee_id: int):
+        invite = await session.execute(select(cls).where(cls.team_id == team_id).where(cls.invitee_id == invitee_id).where(cls.active == True))
+        return invite.scalars().first()

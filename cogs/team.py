@@ -2,13 +2,15 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from models.team import Team
-from models.player import Player
+from models.player import Player, PlayerAlreadyInTeam
 from models.invite import Invite
 from models.transfer import Transfer
 from database import AsyncSessionLocal
 from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
 from config import APPROVAL_REQUIRED, INVITE_CHANNEL
+from utils.enums import TransferType
+from utils.util_funcs import player_join_team
 from utils.views import ConfirmView, InviteApprovalView
 
 @app_commands.guilds(911940380717617202)
@@ -47,9 +49,13 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Only the team captain can invite players."))
                 return
             
+            if await Invite.fetch_active_invite_by_team_id_and_invitee(session, inviter.team_id, invitee.discord_id):
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player has already been invited to this team."))
+                return
+            
             expires_at = datetime.now() + timedelta(days=7)
             invite = await Invite.create(session, inviter.discord_id, invitee.discord_id, inviter.team_id, expires_at)
-            
+            await session.commit()
         # Invites will go through mod channel for approval (will be toggleable in config)
         mod_invite_channel = self.bot.get_channel(INVITE_CHANNEL)
         if APPROVAL_REQUIRED:
@@ -61,9 +67,9 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             await mod_invite_channel.send(embed=approval_embed, view=view)
         else:
             await Invite.approve_status(session, invite.id, True)
+            await session.commit()
             response_message = EmbedGenerator.default_embed(title="Invite Sent", description=f"Invited {player.display_name} to your team.")
             await interaction.response.send_message(embed=response_message)
-        await session.commit()
 
     @app_commands.command(name="invites", description="List all pending invites for your team")
     async def invites(self, interaction: discord.Interaction):
@@ -106,20 +112,34 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team not found."))
                 return
             
-            invite = await Invite.fetch_active_invites_by_invitee(session, player.discord_id)
-            valid_invite = next((inv for inv in invite if inv.team_id == team.id), None)
-            
-            if not valid_invite:
+            invite = await Invite.fetch_active_invite_by_team_id_and_invitee(session, team.id, player.discord_id)
+            if not invite:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
+                        
+            try:
+                success, message = await player_join_team(session, interaction.guild, player, team)
             
-            player.team_id = team.id
-            await Invite.approve_status(session, valid_invite.id, True)
-            await Transfer.create(session, player.discord_id, team.id, team.name, True)
+                if not success:
+                    embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {message}")
+                    await interaction.response.send_message(embed=embed)
+                    return
+                else:
+                    embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team_name} {f'\n\nNote: {message}' if message else ''}.")
+                    await interaction.response.send_message(embed=embed)
+            except PlayerAlreadyInTeam:
+                embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {message}")
+                await interaction.response.send_message(embed=embed)
+                return
+            except Exception as e:
+                embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {e}")
+                await interaction.response.send_message(embed=embed)
+                return
+            
+            await Invite.approve_status(session, invite.id, True)
+            await Transfer.create(session, player.discord_id, team.id, TransferType.PLAYER_JOIN.value)
             await session.commit()
             
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team_name}."))
-
     @app_commands.command(name="decline", description="Decline a team invitation")
     async def decline(self, interaction: discord.Interaction, team_name: str):
         async with AsyncSessionLocal() as session:
