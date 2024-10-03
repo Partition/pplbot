@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
 import models
+from config import TAG_CHARACTER_LIMIT
 from .base import Base
 
 class TeamAlreadyExists(Exception):
@@ -19,7 +20,7 @@ class Team(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True)
-    tag = Column(String(5), unique=True)
+    tag = Column(String(TAG_CHARACTER_LIMIT), unique=True)
     league = Column(String)
     captain_id = Column(BigInteger, ForeignKey("players_table.discord_id"), unique=True)
     created_at = Column(DateTime, server_default=func.now())

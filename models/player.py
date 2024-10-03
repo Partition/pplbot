@@ -3,6 +3,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+
+from config import NICKNAME_CHARACTER_LIMIT, BIO_CHARACTER_LIMIT
 from .base import Base
 import models
 from typing import Optional
@@ -24,10 +26,10 @@ class Player(Base):
     discord_id = Column(BigInteger, primary_key=True, unique=True)
     team_id = Column(Integer, ForeignKey("teams_table.id"))
     registered_at = Column(DateTime, server_default=func.now())
-    nickname = Column(String(32))
+    nickname = Column(String(NICKNAME_CHARACTER_LIMIT))
     is_premium = Column(Boolean, default=False)
-    bio = Column(String(100))
-    role = Column(String(5))
+    bio = Column(String(BIO_CHARACTER_LIMIT))
+    role = Column(String(7))
 
     # Many-to-one relationship with Team
     team = relationship("Team", back_populates="players", foreign_keys=[team_id])
