@@ -28,17 +28,19 @@ async def get_account_info_from_puuid(puuid: str, server: str):
         ranked = await client.get_lol_league_v4_entries_by_summoner(region=server, summoner_id=summoner["id"])
         return account, summoner, get_solo_queue_data(ranked)
 
-
 async def player_join_team(session: AsyncSession, guild: discord.Guild, player: Player, team: Team):
     await player.add_to_team(session, team.id)
     
-    member = await guild.get_member(player.discord_id)
+    member = guild.get_member(player.discord_id)
     if not member:
-        return False
+        return False, "Member not found"
     
-    await member.add_roles(discord.utils.get(guild.roles, name=team.name))
-    await member.edit(nick=f"[{team.tag}] {member.display_name}")
-    return True
+    try:    
+        await member.add_roles(discord.utils.get(guild.roles, name=team.name))
+        await member.edit(nick=f"[{team.tag}] {member.nick}")
+    except discord.Forbidden:
+        return True, "Member is higher in the role hierarchy, **could not add roles or edit nickname**, please check your permissions."
+    return True, ""
 
 async def player_leave_team(session: AsyncSession, guild: discord.Guild, player: Player, team: Team):
     await player.remove_from_team(session, team.id)

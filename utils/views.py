@@ -53,22 +53,10 @@ class InviteApprovalButton(discord.ui.DynamicItem[discord.ui.Button], template=r
             current_embed = interaction.message.embeds[0]
 
             if self.is_approve:
-                player = await Player.fetch_from_discord_id(session, invite.invitee_id)
-                team = await Team.fetch_from_id(session, invite.team_id)
-                
-                try:
-                    success = await player_join_team(interaction.guild, player, team)
-                    if not success:
-                        current_embed.title = "Approval Failed - Could Not Add Player"
-                        current_embed.color = discord.Color.red()
-                    else:
-                        current_embed.title = "Invite Approved"
-                        current_embed.color = discord.Color.green()
-                        current_embed.set_footer(text=f"Invite approved by {interaction.user.display_name}")
-                        # TODO: Notify the inviter and invitee
-                except PlayerAlreadyInTeam:
-                    current_embed.title = "Approval Failed - Player Already in Team"
-                    current_embed.color = discord.Color.red()
+                current_embed.title = "Invite Approved"
+                current_embed.color = discord.Color.green()
+                current_embed.set_footer(text=f"Invite approved by {interaction.user.display_name}")
+                    # TODO: Notify the inviter and invitee
             else:
                 current_embed.title = "Invite Denied"
                 current_embed.color = discord.Color.red()
