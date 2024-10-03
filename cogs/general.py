@@ -1,16 +1,14 @@
 from discord.ext import commands
 from discord import app_commands
 import discord
-
 from models import Account
 from utils.embed_gen import EmbedGenerator
 from models.player import Player, PlayerDoesNotExist
 from models.team import Team
-from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
-from config import LANE_ROLES
+from config import REGISTERED_ROLE
 from random import choice
-
+from utils.enums import LeagueRole
 from utils.util_funcs import get_multi_opgg, get_opgg
 
 
@@ -32,29 +30,24 @@ class General(commands.Cog):
         await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Cling!", description=f"The result is **{result}**"))
 
     @app_commands.command(name="register", description="Register to the database")
+    @app_commands.describe(role="The role of the player", nickname="The nickname of the player")
     @app_commands.guilds(911940380717617202)
-    async def register(self, interaction: discord.Interaction):
-        member_roles = [role.name for role in interaction.user.roles]
-        lane_role = list(filter(lambda x: x in LANE_ROLES, member_roles))
-        
-        if not lane_role:
-            await interaction.response.send_message(
-                embed=EmbedGenerator.error_embed(
-                    title="Registration Failed",
-                    description="You must have a lane role to register."
-                )
-            )
-            return
-        
+    async def register(self, interaction: discord.Interaction, role: LeagueRole, nickname: str):     
         async with AsyncSessionLocal() as session:
-            # Create a new player
             new_player = await Player.create(
                 session,
                 discord_id=interaction.user.id,
-                role=lane_role[0]
+                role=role.value,
+                nickname=nickname
             )
             await session.commit()
-       
+               
+        league_role = discord.utils.get(interaction.guild.roles, name=role.value)
+        await interaction.user.add_roles(discord.Object(id=REGISTERED_ROLE), league_role)
+        try:
+            await interaction.user.edit(nick=nickname)
+        except discord.Forbidden:
+            pass
         
         await interaction.response.send_message(
             embed=EmbedGenerator.success_embed(

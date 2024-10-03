@@ -8,30 +8,8 @@ from utils.views import ConfirmView
 from utils.util_funcs import get_account_info, get_account_info_from_puuid
 from models.account import Account
 from random import choice
-from enum import Enum
 from datetime import datetime
-
-class LeagueTier(Enum):
-    IRON = 0
-    BRONZE = 1
-    SILVER = 2
-    GOLD = 3
-    PLATINUM = 4
-    EMERALD = 5
-    DIAMOND = 6
-    MASTER = 7
-    GRANDMASTER = 8
-    CHALLENGER = 9
-
-class LeagueRank(Enum):
-    I = 4
-    II = 3
-    III = 2
-    IV = 1
-
-class LeagueServer(Enum):
-    EUNE = "eun1"
-    EUW = "euw1"
+from utils.enums import LeagueServer, LeagueTier, LeagueRank
 
 @app_commands.guilds(911940380717617202)
 class AccountCog(commands.GroupCog, group_name="account", description="Account management commands"):
