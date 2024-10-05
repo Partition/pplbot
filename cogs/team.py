@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from models.team import Team
-from models.player import Player, PlayerAlreadyInTeam
+from models.player import Player, PlayerAlreadyInTeam, PlayerNotInTeam
 from models.invite import Invite
 from models.transfer import Transfer
 from database import AsyncSessionLocal
@@ -10,7 +10,7 @@ from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
 from config import APPROVAL_REQUIRED, INVITE_CHANNEL
 from utils.enums import TransferType
-from utils.util_funcs import player_join_team
+from utils.util_funcs import player_join_team, player_leave_team
 from utils.views import ConfirmView, InviteApprovalView
 
 @app_commands.guilds(911940380717617202)
@@ -76,10 +76,6 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
             
-            if not player:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be registered to use this command."))
-                return
-            
             if not player.team_id:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be in a team to view invites."))
                 return
@@ -99,7 +95,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Active Invites", description=invite_list))
 
     @app_commands.command(name="accept", description="Accept a team invitation")
-    async def accept(self, interaction: discord.Interaction, team_name: str):
+    async def accept(self, interaction: discord.Interaction, team_tag: str):
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
             
@@ -107,100 +103,78 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are already in a team."))
                 return
             
-            team = await Team.fetch_from_name(session, team_name)
+            team = await Team.fetch_from_tag(session, team_tag)
             if not team:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team not found."))
                 return
             
-            invite = await Invite.fetch_active_invite_by_team_id_and_invitee(session, team.id, player.discord_id)
+            invite = await Invite.fetch_active_invite_by_team_tag_and_invitee(session, team.tag, player.discord_id)
             if not invite:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
-                        
-            try:
-                success, message = await player_join_team(session, interaction.guild, player, team)
-            
-                if not success:
-                    embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {message}")
-                    await interaction.response.send_message(embed=embed)
-                    return
-                else:
-                    embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team_name} {f'\n\nNote: {message}' if message else ''}.")
-                    await interaction.response.send_message(embed=embed)
-            except PlayerAlreadyInTeam:
+                    
+            success, message = await player_join_team(session, interaction.guild, player, team)
+        
+            if not success:
                 embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {message}")
-                await interaction.response.send_message(embed=embed)
-                return
-            except Exception as e:
-                embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {e}")
                 await interaction.response.send_message(embed=embed)
                 return
             
             await Invite.approve_status(session, invite.id, True)
-            await Transfer.create(session, player.discord_id, team.id, TransferType.PLAYER_JOIN.value)
             await session.commit()
             
-    @app_commands.command(name="decline", description="Decline a team invitation")
-    async def decline(self, interaction: discord.Interaction, team_name: str):
-        async with AsyncSessionLocal() as session:
-            player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            if "Database updated" in message:
+                embed = EmbedGenerator.warning_embed(title="Invite Partially Accepted", description=f"You have joined {team.name} in the database, but: {message}")
+            else:
+                embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team.name}. {message}")
             
-            if not player:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be registered to use this command."))
-                return
-            
-            team = await Team.fetch_from_name(session, team_name)
-            if not team:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team not found."))
-                return
-            
-            invite = await Invite.fetch_active_invites_by_invitee(session, player.discord_id)
-            valid_invite = next((inv for inv in invite if inv.team_id == team.id), None)
-            
-            if not valid_invite:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
-                return
-            
-            await Invite.approve_status(session, valid_invite.id, False)
-            
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team_name}."))
+            await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="leave", description="Leave your current team")
     async def leave(self, interaction: discord.Interaction):
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
             
-            if not player:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be registered to use this command."))
-                return
-            
             if not player.team_id:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not in a team."))
                 return
             
-            team = await Team.fetch_from_id(session, player.team_id)
-            if team.captain_id == player.discord_id:
+            if await player.is_captain:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team captains cannot leave their team. Transfer ownership first."))
                 return
             
-            old_team_name = team.name
-            await player.leave_team(session)
-            await Transfer.create(session, player.discord_id, None, old_team_name, False)
+            team = await Team.fetch_from_id(session, player.team_id)
             
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Left", description="You have left your team."))
+            success, message = await player_leave_team(session, interaction.guild, player, team)
+            
+            if not success:
+                embed = EmbedGenerator.error_embed(title="Leave Failed", description=f"Could not leave team: {message}")
+                await interaction.response.send_message(embed=embed)
+                return
+            
+            if "Database updated" in message:
+                embed = EmbedGenerator.warning_embed(title="Leave Partially Successful", description=f"You have left the team in the database, but: {message}")
+            else:
+                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team. {message}")
+            
+            await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="kick", description="Kick a player from your team")
-    async def kick(self, interaction: discord.Interaction, player: discord.Member):
+    async def kick(self, interaction: discord.Interaction, member: discord.Member):
         async with AsyncSessionLocal() as session:
             kicker = await Player.fetch_from_discord_id(session, interaction.user.id)
-            kicked = await Player.fetch_from_discord_id(session, player.id)
+            kicked = await Player.fetch_from_discord_id(session, member.id)
             
-            if not kicker or not kicked:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Both players must be registered."))
+            if not kicked:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is not registered."))
                 return
             
             if not kicker.team_id:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be in a team to kick players."))
+                return
+            
+            if kicked.discord_id == kicker.discord_id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You cannot kick yourself."))
                 return
             
             team = await Team.fetch_from_id(session, kicker.team_id)
@@ -212,11 +186,109 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is not in your team."))
                 return
             
-            await kicked.leave_team(session)
-            await Transfer.create(session, kicked.discord_id, None, team.name, False)
+            success, message = await player_leave_team(session, interaction.guild, kicked, team)
             
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Player Kicked", description=f"Kicked {player.display_name} from your team."))
+            if not success:
+                embed = EmbedGenerator.error_embed(title="Kick Failed", description=f"Could not kick player from team: {message}")
+                await interaction.response.send_message(embed=embed)
+                return
+            
+            if "Database updated" in message:
+                embed = EmbedGenerator.warning_embed(title="Kick Partially Successful", description=f"Player removed from team in database, but: {message}")
+            else:
+                embed = EmbedGenerator.success_embed(title="Player Kicked", description=f"Kicked {member.display_name} from your team. {message}")
+            
+            await interaction.response.send_message(embed=embed)
+            
+    @app_commands.command(name="decline", description="Decline a team invitation")
+    async def decline(self, interaction: discord.Interaction, team_tag: str):
+        async with AsyncSessionLocal() as session:
+            player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            
+            team = await Team.fetch_from_tag(session, team_tag)
+            if not team:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team not found."))
+                return
+            
+            invite = await Invite.fetch_active_invite_by_team_tag_and_invitee(session, team.tag, player.discord_id)
+            if not invite:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
+                return
+            
+            await Invite.approve_status(session, invite.id, False)
+            await session.commit()
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team_name}."))
 
+    @app_commands.command(name="leave", description="Leave your current team")
+    async def leave(self, interaction: discord.Interaction):
+        async with AsyncSessionLocal() as session:
+            player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            
+            if not player.team_id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not in a team."))
+                return
+            
+            if await player.is_captain:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team captains cannot leave their team. Transfer ownership first."))
+                return
+            
+            team = await Team.fetch_from_id(session, player.team_id)
+            
+            success, message = await player_leave_team(session, interaction.guild, player, team)
+            
+            if not success:
+                embed = EmbedGenerator.error_embed(title="Leave Failed", description=f"Could not leave team: {message}")
+                await interaction.response.send_message(embed=embed)
+                return
+            
+            if "Database updated" in message:
+                embed = EmbedGenerator.warning_embed(title="Leave Partially Successful", description=f"You have left the team in the database, but: {message}")
+            else:
+                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team. {message}")
+            
+            await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="kick", description="Kick a player from your team")
+    async def kick(self, interaction: discord.Interaction, member: discord.Member):
+        async with AsyncSessionLocal() as session:
+            kicker = await Player.fetch_from_discord_id(session, interaction.user.id)
+            kicked = await Player.fetch_from_discord_id(session, member.id)
+            
+            if not kicked:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is not registered."))
+                return
+            
+            if not kicker.team_id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be in a team to kick players."))
+                return
+            
+            if kicked.discord_id == kicker.discord_id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You cannot kick yourself."))
+                return
+            
+            team = await Team.fetch_from_id(session, kicker.team_id)
+            if team.captain_id != kicker.discord_id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Only the team captain can kick players."))
+                return
+            
+            if kicked.team_id != team.id:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is not in your team."))
+                return
+            
+            success, message = await player_leave_team(session, interaction.guild, kicked, team)
+            
+            if not success:
+                embed = EmbedGenerator.error_embed(title="Kick Failed", description=f"Could not kick player from team: {message}")
+                await interaction.response.send_message(embed=embed)
+                return
+            
+            if "Database updated" in message:
+                embed = EmbedGenerator.warning_embed(title="Kick Partially Successful", description=f"Player removed from team in database, but: {message}")
+            else:
+                embed = EmbedGenerator.success_embed(title="Player Kicked", description=f"Kicked {member.display_name} from your team. {message}")
+            
+            await interaction.response.send_message(embed=embed)
+            
     @app_commands.command(name="transfer", description="Transfer team ownership to another player")
     async def transferownership(self, interaction: discord.Interaction, new_owner: discord.Member):
         async with AsyncSessionLocal() as session:

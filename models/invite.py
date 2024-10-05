@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
 from .base import Base
 from datetime import datetime, timedelta
+from models.team import Team
 
 class Invite(Base):
     __tablename__ = "invites_table"
@@ -80,4 +81,9 @@ class Invite(Base):
     @classmethod
     async def fetch_active_invite_by_team_id_and_invitee(cls, session: AsyncSession, team_id: int, invitee_id: int):
         invite = await session.execute(select(cls).where(cls.team_id == team_id).where(cls.invitee_id == invitee_id).where(cls.active == True))
+        return invite.scalars().first()
+    
+    @classmethod
+    async def fetch_active_invite_by_team_tag_and_invitee(cls, session: AsyncSession, team_tag: str, invitee_id: int):
+        invite = await session.execute(select(cls).join(Team).where(Team.tag == team_tag).where(cls.invitee_id == invitee_id).where(cls.active == True))
         return invite.scalars().first()
