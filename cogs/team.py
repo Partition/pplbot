@@ -217,7 +217,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             
             await Invite.approve_status(session, invite.id, False)
             await session.commit()
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team_name}."))
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team.name}."))
 
     @app_commands.command(name="leave", description="Leave your current team")
     async def leave(self, interaction: discord.Interaction):
