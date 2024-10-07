@@ -90,7 +90,7 @@ class General(commands.Cog):
                         description=f"Your nickname cannot exceed 24 characters"
                     )
                 )
-            
+
             team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
             team_tag = f"[{team.tag}] " if team else ""
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
@@ -132,8 +132,8 @@ class General(commands.Cog):
 
     @app_commands.command(name="profile", description="View a profile")
     @app_commands.guilds(911940380717617202)
-    async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
-        if member is None:
+    async def profile(self, interaction: discord.Interaction, member: discord.Member = ""):
+        if member:
             member=interaction.user
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, member.id)
