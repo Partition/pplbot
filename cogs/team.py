@@ -113,49 +113,20 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
                     
-            success, message = await player_join_team(session, interaction.guild, player, team)
+            success, message = await player_join_team(session, interaction, player, team)
         
             if not success:
                 embed = EmbedGenerator.error_embed(title="Invite Acceptance Failed", description=f"Could not add player to team: {message}")
                 await interaction.response.send_message(embed=embed)
                 return
             
-            await Invite.approve_status(session, invite.id, True)
+            await Invite.accept_invite(session, invite.id)
             await session.commit()
             
             if "Database updated" in message:
                 embed = EmbedGenerator.warning_embed(title="Invite Partially Accepted", description=f"You have joined {team.name} in the database, but: {message}")
             else:
-                embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team.name}. {message}")
-            
-            await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="leave", description="Leave your current team")
-    async def leave(self, interaction: discord.Interaction):
-        async with AsyncSessionLocal() as session:
-            player = await Player.fetch_from_discord_id(session, interaction.user.id)
-            
-            if not player.team_id:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not in a team."))
-                return
-            
-            if await player.is_captain:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team captains cannot leave their team. Transfer ownership first."))
-                return
-            
-            team = await Team.fetch_from_id(session, player.team_id)
-            
-            success, message = await player_leave_team(session, interaction.guild, player, team)
-            
-            if not success:
-                embed = EmbedGenerator.error_embed(title="Leave Failed", description=f"Could not leave team: {message}")
-                await interaction.response.send_message(embed=embed)
-                return
-            
-            if "Database updated" in message:
-                embed = EmbedGenerator.warning_embed(title="Leave Partially Successful", description=f"You have left the team in the database, but: {message}")
-            else:
-                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team. {message}")
+                embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team.name}.")
             
             await interaction.response.send_message(embed=embed)
 
@@ -186,7 +157,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is not in your team."))
                 return
             
-            success, message = await player_leave_team(session, interaction.guild, kicked, team)
+            success, message = await player_leave_team(session, interaction, kicked, team)
             
             if not success:
                 embed = EmbedGenerator.error_embed(title="Kick Failed", description=f"Could not kick player from team: {message}")
@@ -215,7 +186,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
             
-            await Invite.approve_status(session, invite.id, False)
+            await Invite.decline_invite(session, invite.id)
             await session.commit()
             await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team.name}."))
 
@@ -228,13 +199,13 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not in a team."))
                 return
             
-            if await player.is_captain:
+            if await Player.is_captain(session, player.discord_id):
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Team captains cannot leave their team. Transfer ownership first."))
                 return
             
             team = await Team.fetch_from_id(session, player.team_id)
             
-            success, message = await player_leave_team(session, interaction.guild, player, team)
+            success, message = await player_leave_team(session, interaction, player, team)
             
             if not success:
                 embed = EmbedGenerator.error_embed(title="Leave Failed", description=f"Could not leave team: {message}")
@@ -244,7 +215,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             if "Database updated" in message:
                 embed = EmbedGenerator.warning_embed(title="Leave Partially Successful", description=f"You have left the team in the database, but: {message}")
             else:
-                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team. {message}")
+                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team.")
             
             await interaction.response.send_message(embed=embed)
 
@@ -275,7 +246,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is not in your team."))
                 return
             
-            success, message = await player_leave_team(session, interaction.guild, kicked, team)
+            success, message = await player_leave_team(session, interaction, kicked, team)
             
             if not success:
                 embed = EmbedGenerator.error_embed(title="Kick Failed", description=f"Could not kick player from team: {message}")

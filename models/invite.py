@@ -52,6 +52,22 @@ class Invite(Base):
             await session.flush()
         return invite
     
+    @classmethod
+    async def accept_invite(cls, session: AsyncSession, invite_id: int):
+        invite = await session.get(cls, invite_id)
+        if invite:
+            invite.approved = True
+            invite.active = False
+            await session.flush()
+    
+    @classmethod
+    async def decline_invite(cls, session: AsyncSession, invite_id: int):
+        invite = await session.get(cls, invite_id)
+        if invite:
+            invite.approved = False
+            invite.active = False
+            await session.flush()
+    
     # Fetchters
     @classmethod
     async def fetch_from_id(cls, session: AsyncSession, invite_id: int):

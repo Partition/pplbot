@@ -67,8 +67,8 @@ class General(commands.Cog):
         except discord.Forbidden:
             return await interaction.response.send_message(
                 embed=EmbedGenerator.error_embed(
-                    title="kill yourself",
-                    description=f"Welcome, {new_player.nickname}! faggot."
+                    title="Registration Successful",
+                    description=f"Welcome, {new_player.nickname}! You have been registered."
                 )
             )
 
@@ -133,8 +133,8 @@ class General(commands.Cog):
     @app_commands.command(name="profile", description="View a profile")
     @app_commands.guilds(911940380717617202)
     async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
-        if member is None:
-            member=interaction.user
+        if not member:
+            member = interaction.user
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, member.id)
             if not player:
@@ -149,7 +149,7 @@ class General(commands.Cog):
                 team_name = team.name
                 captain = await Player.fetch_from_discord_id(session, team.captain_id)
                 captain_member = interaction.guild.get_member(captain.discord_id)
-                captain_mention = captain_member.mention
+                captain_mention = captain_member.mention if captain_member else "None"
                 team_tag = team.tag
 
             account_info = await Account.fetch_all_from_player_id(session, member.id)
