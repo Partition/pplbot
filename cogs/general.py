@@ -83,6 +83,14 @@ class General(commands.Cog):
     @app_commands.guilds(911940380717617202)
     async def nick(self, interaction: discord.Interaction, nickname: str = ""):
         async with AsyncSessionLocal() as session:
+            if len(nickname) > NICKNAME_CHARACTER_LIMIT:
+               return await interaction.response.send_message(
+                    embed=EmbedGenerator.error_embed(
+                        title="Registration Failed",
+                        description=f"Your nickname cannot exceed 24 characters"
+                    )
+                )
+            
             team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
             team_tag = f"[{team.tag}] " if team else ""
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
