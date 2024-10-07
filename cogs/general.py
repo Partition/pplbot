@@ -132,8 +132,8 @@ class General(commands.Cog):
 
     @app_commands.command(name="profile", description="View a profile")
     @app_commands.guilds(911940380717617202)
-    async def profile(self, interaction: discord.Interaction, member: discord.Member = ""):
-        if member:
+    async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
+        if member is None:
             member=interaction.user
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, member.id)
