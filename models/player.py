@@ -1,6 +1,7 @@
 from sqlalchemy import Table, Column, BigInteger, Integer, String, Boolean, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, joinedload
 from sqlalchemy.sql import func, select
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -44,11 +45,16 @@ class Player(Base):
     transfers = relationship("Transfer", back_populates="player")
     accounts = relationship("Account", back_populates="player", foreign_keys="Account.player_id")
     
-    @property
-    async def is_captain(self):
-        if self.team is None:
+    @classmethod
+    async def is_captain(cls, session: AsyncSession, discord_id: int) -> bool:
+        stmt = select(cls).where(cls.discord_id == discord_id).options(joinedload(cls.team))
+        result = await session.execute(stmt)
+        player = result.scalar_one_or_none()
+        
+        if player is None or player.team is None:
             return False
-        return self.team.captain_id == self.discord_id
+        
+        return player.team.captain_id == player.discord_id
     
     async def to_dict(self):
         return {

@@ -7,6 +7,8 @@ from models.player import Player
 from models.transfer import Transfer
 from models.team import TeamNameAlreadyExists, TeamTagAlreadyExists
 from utils.embed_gen import EmbedGenerator
+from utils.enums import TransferType
+from utils.util_funcs import player_join_team, player_leave_team
 from utils.views import ConfirmView
 
 @app_commands.guilds(911940380717617202)
@@ -50,13 +52,11 @@ class Admin(commands.Cog):
                     return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is already in a team."))
                 
                 team = await Team.create(session, name, tag, player.discord_id, league)
-                player.team_id = team.id
-                await Transfer.create(session, player.discord_id, team.id, transfer_type=2)
+                await interaction.guild.create_role(name=name, hoist=True, mentionable=True, reason="Team created by " + interaction.user.name)
+                success, message = await player_join_team(session, interaction, player, team, TransferType.TEAM_CREATE)
+                if not success:
+                    return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=message))
                 await session.commit()
-                
-            # Role and channel creation
-            new_team_role = await interaction.guild.create_role(name=name, hoist=True, mentionable=True, reason="Team created by " + interaction.user.name)
-            await interaction.user.add_roles(new_team_role)
             
             await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Created", description=f"Successfully created team {name} ({tag})."))
         except TeamNameAlreadyExists:
@@ -118,10 +118,7 @@ class Admin(commands.Cog):
             if confirm_view.value is None or not confirm_view.value:
                 return await interaction.edit_original_response(embed=EmbedGenerator.error_embed(title="Failed", description="Action cancelled by user."), view=None)
             
-            # Delete all channels and role
-            role = discord.utils.get(interaction.guild.roles, name=team.name)
-            if role:
-                await role.delete()
+            
             
             category_channel = discord.utils.get(interaction.guild.categories, name=team.name)
             if category_channel:
@@ -134,12 +131,19 @@ class Admin(commands.Cog):
             voice_channel = discord.utils.get(interaction.guild.voice_channels, name=team.name)
             if voice_channel:
                 await voice_channel.delete()
-
+            
+            players = await Player.fetch_all_from_team_id(session, team.id)
+            for player in players:
+                await player_leave_team(session, interaction, player, team, TransferType.TEAM_DISBAND)
+            
+            role = discord.utils.get(interaction.guild.roles, name=team.name)
+            if role:
+                await role.delete()
+                
             await Team.archive(session, team.id)
             await session.commit()
             await interaction.edit_original_response(embed=EmbedGenerator.success_embed(title="Team Archived", description=f"Successfully archived team {team.name} ({team_tag}). All related channels have been deleted."),
                                                      view=None)
-    
-    
+         
 async def setup(bot):
     await bot.add_cog(Admin(bot))
