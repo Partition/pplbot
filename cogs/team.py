@@ -1,17 +1,17 @@
+import math
 import discord
 from discord.ext import commands
 from discord import app_commands
 from models.team import Team
-from models.player import Player, PlayerAlreadyInTeam, PlayerNotInTeam
+from models.player import Player
 from models.invite import Invite
-from models.transfer import Transfer
 from database import AsyncSessionLocal
 from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
 from config import APPROVAL_REQUIRED, INVITE_CHANNEL
-from utils.enums import TransferType
-from utils.util_funcs import player_join_team, player_leave_team
-from utils.views import ConfirmView, InviteApprovalView
+from utils.paginator import ButtonPaginator
+from utils.util_funcs import get_discord_unix_timestamp_long, player_join_team, player_leave_team
+from utils.views import InviteApprovalView
 
 @app_commands.guilds(911940380717617202)
 class TeamCog(commands.GroupCog, group_name="team", description="Team management commands"):
@@ -91,8 +91,16 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Invites", description="No active invites found."))
                 return
             
-            invite_list = "\n".join([f"<@{invite.invitee_id}> (Expires: {invite.expires_at.strftime('%Y-%m-%d %H:%M:%S')})" for invite in active_invites])
-            await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Active Invites", description=invite_list))
+            per_page = 5
+            amount_of_pages = math.ceil(len(active_invites) / per_page)
+            pages = [EmbedGenerator.default_embed(
+                title=f"Invite list - {team.name}", 
+                description="\n".join([f"- <@{invite.invitee_id}> (Expires: {get_discord_unix_timestamp_long(invite.expires_at)})" for invite in active_invites[i*per_page:(i+1)*per_page]])) for i in range(amount_of_pages)]
+            if amount_of_pages > 1:
+                paginator = ButtonPaginator(pages)
+                await paginator.start(interaction)
+                return
+            await interaction.response.send_message(embed=pages[0])
 
     @app_commands.command(name="accept", description="Accept a team invitation")
     async def accept(self, interaction: discord.Interaction, team_tag: str):

@@ -99,7 +99,7 @@ async def send_transfer_message(session: AsyncSession, interaction: discord.Inte
     elif transfer_type == TransferType.TEAM_CREATE:
         message = f"🟢 {mention} created **{team.name}** <t:{int(time())}:f>"
         
-    await Transfer.create(session, player.discord_id, team.id, transfer_type.value)
+    await Transfer.create(session, player.discord_id, team.id, transfer_type.value, player.role)
     await transfer_channel.send(message)
     
 def get_multi_opgg(server: str, display_names: list):
@@ -110,3 +110,9 @@ def get_multi_opgg(server: str, display_names: list):
 
 def get_opgg(server: str, display_name: str):
     return f"https://www.op.gg/summoners/{server}/{display_name.replace(" ", "+").replace("#","-")}"
+
+def get_discord_unix_timestamp_long(datetime_obj: datetime.datetime): # 15 October 2024 00:51
+    return f"<t:{int(datetime_obj.timestamp())}:f>"
+
+def get_discord_unix_timestamp_short(datetime_obj: datetime.datetime): # 15/10/2024
+    return f"<t:{int(datetime_obj.timestamp())}:d>"
