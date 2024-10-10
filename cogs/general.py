@@ -1,9 +1,11 @@
 from imghdr import tests
+import math
 
 from discord.ext import commands
 from discord import app_commands
 import discord
 from models import Account
+from models.invite import Invite
 from utils.embed_gen import EmbedGenerator
 from models.player import Player, PlayerDoesNotExist, PlayerAlreadyExists
 from models.team import Team
@@ -11,7 +13,7 @@ from database import AsyncSessionLocal
 from config import REGISTERED_ROLE, NICKNAME_CHARACTER_LIMIT
 from random import choice
 from utils.enums import LeagueRole
-from utils.util_funcs import get_multi_opgg, get_opgg
+from utils.util_funcs import get_discord_unix_timestamp_long, get_multi_opgg, get_opgg
 from utils.paginator import ButtonPaginator
 
 class General(commands.Cog):
@@ -66,7 +68,7 @@ class General(commands.Cog):
 
         except discord.Forbidden:
             return await interaction.response.send_message(
-                embed=EmbedGenerator.error_embed(
+                embed=EmbedGenerator.success_embed(
                     title="Registration Successful",
                     description=f"Welcome, {new_player.nickname}! You have been registered."
                 )
@@ -186,7 +188,33 @@ class General(commands.Cog):
                  EmbedGenerator.default_embed(title=f"Team B", description=f"Members: bbbb.")]
         paginator = ButtonPaginator(pages)
         await paginator.start(interaction)
-        
+
+    @app_commands.command(name="invites", description="View your active invites")
+    @app_commands.guilds(911940380717617202)
+    async def invites(self, interaction: discord.Interaction):
+        async with AsyncSessionLocal() as session:
+            player = await Player.fetch_from_discord_id(session, interaction.user.id)
+            if not player:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(
+                    title="Invites",description="You need to be registered to view your invites"))
+                return
+            active_invites = await Invite.fetch_active_invites_by_invitee(session, player.discord_id)
+            
+            if not active_invites:
+                await interaction.response.send_message(embed=EmbedGenerator.error_embed(
+                    title="Invites",description="You have no active invites"))
+                return
+            
+        per_page = 5
+        amount_of_pages = math.ceil(len(active_invites) / per_page)
+        pages = [EmbedGenerator.default_embed(
+                title=f"Invite list - {player.nickname}", 
+                description="\n".join([f"- <@{invite.team_id}> (Expires: {get_discord_unix_timestamp_long(invite.expires_at)})" for invite in active_invites[i*per_page:(i+1)*per_page]])) for i in range(amount_of_pages)]
+        if amount_of_pages > 1:
+            paginator = ButtonPaginator(pages)
+            await paginator.start(interaction)
+            return
+        await interaction.response.send_message(embed=pages[0])
 
 async def setup(bot):
     await bot.add_cog(General(bot))
