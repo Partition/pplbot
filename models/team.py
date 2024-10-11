@@ -113,3 +113,15 @@ class Team(Base):
         )
         return result.scalars().first()
 
+    @classmethod
+    async def search_by_name_or_tag(cls, session: AsyncSession, search_term: str):
+        search_pattern = f"%{search_term}%"
+        result = await session.execute(
+            select(cls).filter(
+                or_(
+                    cls.name.ilike(search_pattern),
+                    cls.tag.ilike(search_pattern)
+                )
+            )
+        )
+        return result.scalars().all()
