@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger, or_, join
+from typing import Optional
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, BigInteger, or_, join, and_
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
@@ -28,10 +29,10 @@ class Team(Base):
     active = Column(Boolean, default=True)
 
     # One-to-many relationship with Player (players in a team)
-    players = relationship("Player", back_populates="team", foreign_keys="[Player.team_id]")
+    players = relationship("Player", back_populates="team", foreign_keys="[Player.team_id]", lazy="selectin")
     # One-to-one relationship with captain (specific player as captain)
-    captain = relationship("Player", back_populates="captained_team", foreign_keys=[captain_id], uselist=False)
-    transfers = relationship("Transfer", back_populates="team")
+    captain = relationship("Player", back_populates="captained_team", foreign_keys=[captain_id], uselist=False, lazy="selectin")
+    transfers = relationship("Transfer", back_populates="team", foreign_keys="[Transfer.team_id]", lazy="selectin")
     strikes_received = relationship("Strike", foreign_keys="Strike.issued_for_team_id", back_populates="issued_for_team")
     
     @classmethod
@@ -114,14 +115,20 @@ class Team(Base):
         return result.scalars().first()
 
     @classmethod
-    async def search_by_name_or_tag(cls, session: AsyncSession, search_term: str):
+    async def search_by_name_or_tag_in_league(cls, session: AsyncSession, search_term: str, league: Optional[str] = None):
         search_pattern = f"%{search_term}%"
-        result = await session.execute(
-            select(cls).filter(
-                or_(
-                    cls.name.ilike(search_pattern),
-                    cls.tag.ilike(search_pattern)
-                )
-            )
+        query = select(cls).filter(
+            or_(
+                cls.name.ilike(search_pattern),
+                cls.tag.ilike(search_pattern),
+            ),
+            cls.active == True
         )
+
+        if league:
+            query = query.filter(
+                cls.league == league
+            )
+
+        result = await session.execute(query)
         return result.scalars().all()
