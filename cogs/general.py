@@ -12,7 +12,7 @@ from models.team import Team
 from database import AsyncSessionLocal
 from config import REGISTERED_ROLE, NICKNAME_CHARACTER_LIMIT
 from random import choice
-from utils.enums import LeagueRole
+from utils.enums import LeagueRole, TeamLeague
 from utils.util_funcs import get_discord_unix_timestamp_long, get_multi_opgg, get_opgg
 from utils.paginator import ButtonPaginator
 
@@ -215,6 +215,6 @@ class General(commands.Cog):
             await paginator.start(interaction)
             return
         await interaction.response.send_message(embed=pages[0])
-
+        
 async def setup(bot):
     await bot.add_cog(General(bot))
