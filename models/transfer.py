@@ -15,8 +15,8 @@ class Transfer(Base):
     transfer_type = Column(Integer)
     transfer_date = Column(DateTime, server_default=func.now())
 
-    player = relationship("Player", back_populates="transfers")
-    team = relationship("Team", back_populates="transfers")
+    player = relationship("Player", back_populates="transfers", foreign_keys=[player_id], lazy="selectin")
+    team = relationship("Team", back_populates="transfers", foreign_keys=[team_id], lazy="selectin")
     
     # 0: Player leave
     # 1: Player join

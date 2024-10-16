@@ -1,8 +1,11 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, BigInteger
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+
+from utils.enums import LeagueRank, LeagueTier
 from .base import Base
 from datetime import datetime
 
@@ -44,6 +47,10 @@ class Account(Base):
 
     def __str__(self):
         return f"{self.summoner_name}#{self.summoner_tag}"
+    
+    @hybrid_property
+    def numerical_lp(self):
+        return LeagueTier[self.tier].value * 1000 + LeagueRank[self.rank].value * 100 + self.league_points
     
     @classmethod
     async def check_if_username_and_tag_exists(cls, session: AsyncSession, username: str, tag: str, server: str) -> bool:
