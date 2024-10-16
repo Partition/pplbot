@@ -22,7 +22,7 @@ class Invite(Base):
     
     inviter = relationship("Player", foreign_keys=[inviter_id], back_populates="invites_sent")
     invitee = relationship("Player", foreign_keys=[invitee_id], back_populates="invites_received")
-    team = relationship("Team")
+    team = relationship("Team", foreign_keys=[team_id], lazy="selectin")
 
     @classmethod
     async def create(cls, session: AsyncSession, inviter_id: int, invitee_id: int, team_id: int, expires_at: datetime):

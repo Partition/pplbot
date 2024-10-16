@@ -30,10 +30,10 @@ class Player(Base):
     nickname = Column(String(NICKNAME_CHARACTER_LIMIT))
     is_premium = Column(Boolean, default=False)
     bio = Column(String(BIO_CHARACTER_LIMIT))
-    role = Column(String(7))
+    role = Column(String)
 
     # Many-to-one relationship with Team
-    team = relationship("Team", back_populates="players", foreign_keys=[team_id])
+    team = relationship("Team", back_populates="players", foreign_keys=[team_id], lazy="selectin")
 
     # One-to-one relationship with captain (specific player as captain)
     captained_team = relationship("Team", back_populates="captain", foreign_keys="Team.captain_id", uselist=False)
@@ -42,8 +42,8 @@ class Player(Base):
     invites_received = relationship("Invite", foreign_keys="Invite.invitee_id", back_populates="invitee")
     strikes_issued = relationship("Strike", foreign_keys="Strike.issued_by_id", back_populates="issued_by")
     strikes_received = relationship("Strike", foreign_keys="Strike.issued_for_id", back_populates="issued_for_player")
-    transfers = relationship("Transfer", back_populates="player")
-    accounts = relationship("Account", back_populates="player", foreign_keys="Account.player_id")
+    transfers = relationship("Transfer", back_populates="player", lazy="selectin")
+    accounts = relationship("Account", back_populates="player", foreign_keys="Account.player_id", lazy="selectin")
     
     @classmethod
     async def is_captain(cls, session: AsyncSession, discord_id: int) -> bool:
