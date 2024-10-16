@@ -226,47 +226,6 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team.")
             
             await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="kick", description="Kick a player from your team")
-    async def kick(self, interaction: discord.Interaction, member: discord.Member):
-        async with AsyncSessionLocal() as session:
-            kicker = await Player.fetch_from_discord_id(session, interaction.user.id)
-            kicked = await Player.fetch_from_discord_id(session, member.id)
-            
-            if not kicked:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is not registered."))
-                return
-            
-            if not kicker.team_id:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You must be in a team to kick players."))
-                return
-            
-            if kicked.discord_id == kicker.discord_id:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You cannot kick yourself."))
-                return
-            
-            team = await Team.fetch_from_id(session, kicker.team_id)
-            if team.captain_id != kicker.discord_id:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Only the team captain can kick players."))
-                return
-            
-            if kicked.team_id != team.id:
-                await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is not in your team."))
-                return
-            
-            success, message = await player_leave_team(session, interaction, kicked, team)
-            
-            if not success:
-                embed = EmbedGenerator.error_embed(title="Kick Failed", description=f"Could not kick player from team: {message}")
-                await interaction.response.send_message(embed=embed)
-                return
-            
-            if "Database updated" in message:
-                embed = EmbedGenerator.warning_embed(title="Kick Partially Successful", description=f"Player removed from team in database, but: {message}")
-            else:
-                embed = EmbedGenerator.success_embed(title="Player Kicked", description=f"Kicked {member.display_name} from your team. {message}")
-            
-            await interaction.response.send_message(embed=embed)
             
     @app_commands.command(name="transfer", description="Transfer team ownership to another player")
     async def transferownership(self, interaction: discord.Interaction, new_owner: discord.Member):

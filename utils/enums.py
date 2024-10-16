@@ -23,11 +23,16 @@ class LeagueServer(Enum):
     EUW = "euw1"
 
 class LeagueRole(Enum):
-    TOP = "Top"
-    JUNGLE = "Jungle"
-    MID = "Mid"
-    ADC = "ADC"
-    SUPPORT = "Support"
+    Top = "Top"
+    Jungle = "Jungle"
+    Mid = "Mid"
+    Bot = "Bot"
+    Support = "Support"
+    
+class TeamLeague(Enum):
+    Prime = "Prime"
+    Surrogate = "Surrogate"
+    Trine = "Trine"
 
 class TransferType(Enum):
     PLAYER_JOIN = 1
