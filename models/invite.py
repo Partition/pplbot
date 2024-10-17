@@ -20,8 +20,8 @@ class Invite(Base):
     expires_at = Column(DateTime)
     active = Column(Boolean, default=True) # False = declined, expired, not approved, True = active
     
-    inviter = relationship("Player", foreign_keys=[inviter_id], back_populates="invites_sent")
-    invitee = relationship("Player", foreign_keys=[invitee_id], back_populates="invites_received")
+    inviter = relationship("Player", foreign_keys=[inviter_id], back_populates="invites_sent", lazy="selectin")
+    invitee = relationship("Player", foreign_keys=[invitee_id], back_populates="invites_received", lazy="selectin")
     team = relationship("Team", foreign_keys=[team_id], lazy="selectin")
 
     @classmethod

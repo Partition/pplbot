@@ -1,4 +1,5 @@
 from time import time
+from typing import Union
 from pulsefire.clients import RiotAPIClient
 from dotenv import load_dotenv
 from config import TRANSFER_CHANNEL
@@ -34,6 +35,12 @@ async def get_account_info_from_puuid(puuid: str, server: str):
         summoner = await client.get_lol_summoner_v4_by_puuid(region=server, puuid=puuid)
         ranked = await client.get_lol_league_v4_entries_by_summoner(region=server, summoner_id=summoner["id"])
         return account, summoner, get_solo_queue_data(ranked)
+    
+async def send_dm(interaction: discord.Interaction, member: discord.Member, embed: discord.Embed):
+    try:
+        await member.send(embed=embed)
+    except discord.Forbidden:
+        await interaction.channel.send(content=f"{member.mention} your DMs are disabled! Here's your message anyway:", embed=embed)
 
 # Player joins team (transfer_type = 1 PLAYER JOIN, or 3 TEAM CREATE)
 async def player_join_team(session: AsyncSession, interaction: discord.Interaction, player: Player, team: Team, transfer_type: TransferType = TransferType.PLAYER_JOIN):
@@ -91,13 +98,13 @@ async def send_transfer_message(session: AsyncSession, interaction: discord.Inte
         mention = member.mention
         
     if transfer_type == TransferType.PLAYER_LEAVE:
-        message = f"🔴 {mention} left **{team.name}** <t:{int(time())}:f>"
+        message = f"🔴 {mention} left **{team.name}** ({discord.utils.get(interaction.guild.roles, name=team.name).mention}) <t:{int(time())}:f>"
     elif transfer_type == TransferType.TEAM_DISBAND:
         message = f"🔴 {mention} left **{team.name}** because the team was disbanded <t:{int(time())}:f>"
     elif transfer_type == TransferType.PLAYER_JOIN:
-        message = f"🟢 {mention} joined **{team.name}** <t:{int(time())}:f>"
+        message = f"🟢 {mention} joined **{team.name}** ({discord.utils.get(interaction.guild.roles, name=team.name).mention})<t:{int(time())}:f>"
     elif transfer_type == TransferType.TEAM_CREATE:
-        message = f"🟢 {mention} created **{team.name}** <t:{int(time())}:f>"
+        message = f"🟢 {mention} created **{team.name}** ({discord.utils.get(interaction.guild.roles, name=team.name).mention}) <t:{int(time())}:f>"
         
     await Transfer.create(session, player.discord_id, team.id, transfer_type.value, player.role)
     await transfer_channel.send(message)
