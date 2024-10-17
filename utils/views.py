@@ -5,7 +5,8 @@ from models.player import Player, PlayerAlreadyInTeam
 from models.team import Team
 import re
 
-from utils.util_funcs import player_join_team
+from utils.embed_gen import EmbedGenerator
+from utils.util_funcs import send_dm
 
 class ConfirmView(discord.ui.View):
     def __init__(self, timeout: float | None = None):
@@ -56,16 +57,22 @@ class InviteApprovalButton(discord.ui.DynamicItem[discord.ui.Button], template=r
                 current_embed.title = "Invite Approved"
                 current_embed.color = discord.Color.green()
                 current_embed.set_footer(text=f"Invite approved by {interaction.user.display_name}")
-                    # TODO: Notify the inviter and invitee
+                # Notify the inviter that the invite has been approved
+                inviter_embed = EmbedGenerator.success_embed(title="Invite Approved", description=f"Your invitation of **{invite.invitee.nickname}** to **{invite.team.name}** has been approved by {interaction.user.mention}.")
+                await send_dm(interaction, interaction.guild.get_member(invite.inviter.discord_id), inviter_embed)
+                # Notify the invitee that they have been invited
+                team_invitation_embed = EmbedGenerator.default_embed(title="Team Invitation", description=f"You have been invited to join **{invite.team.name}** by {interaction.user.mention}.")  
+                await send_dm(interaction, interaction.guild.get_member(invite.invitee.discord_id), team_invitation_embed)
             else:
                 current_embed.title = "Invite Denied"
                 current_embed.color = discord.Color.red()
                 current_embed.set_footer(text=f"Invite denied by {interaction.user.display_name}")
-                # TODO: Notify the inviter about the denial
+                # Notify the inviter about the denial
+                denial_embed = EmbedGenerator.error_embed(title="Invite Denial", description=f"Your invitation of **{invite.invitee.nickname}** to **{invite.team.name}** has been denied by {interaction.user.mention}.")
+                await send_dm(interaction, interaction.guild.get_member(invite.inviter.discord_id), denial_embed)
                 
             await Invite.approve_status(session, invite.id, self.is_approve)
             await session.commit()
-            
             await interaction.message.edit(embed=current_embed, view=None)
 
 class InviteApprovalView(discord.ui.View):

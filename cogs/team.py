@@ -10,7 +10,7 @@ from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
 from config import APPROVAL_REQUIRED, INVITE_CHANNEL
 from utils.paginator import ButtonPaginator
-from utils.util_funcs import get_discord_unix_timestamp_long, player_join_team, player_leave_team
+from utils.util_funcs import get_discord_unix_timestamp_long, player_join_team, player_leave_team, send_dm
 from utils.views import InviteApprovalView
 
 @app_commands.guilds(911940380717617202)
@@ -28,10 +28,10 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
         return True
 
     @app_commands.command(name="invite", description="Invite a player to your team")
-    async def invite(self, interaction: discord.Interaction, player: discord.Member):
+    async def invite(self, interaction: discord.Interaction, member: discord.Member):
         async with AsyncSessionLocal() as session:
             inviter = await Player.fetch_from_discord_id(session, interaction.user.id)
-            invitee = await Player.fetch_from_discord_id(session, player.id)
+            invitee = await Player.fetch_from_discord_id(session, member.id)
             team = await Team.fetch_from_id(session, inviter.team_id)
             if not invitee:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Player is not registered."))
@@ -45,7 +45,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="This player is already in a team."))
                 return
             
-            if not await inviter.is_captain:
+            if not inviter.is_captain:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="Only the team captain can invite players."))
                 return
             
@@ -56,21 +56,29 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             expires_at = datetime.now() + timedelta(days=7)
             invite = await Invite.create(session, inviter.discord_id, invitee.discord_id, inviter.team_id, expires_at)
             await session.commit()
+            
         # Invites will go through mod channel for approval (will be toggleable in config)
         mod_invite_channel = self.bot.get_channel(INVITE_CHANNEL)
         if APPROVAL_REQUIRED:
-            response_message = EmbedGenerator.default_embed(title="Invite Needs Approval", description=f"Your invitation of {player.display_name} to {team.name} needs approval. Please wait for approval.")
+            # Notify interaction user that invite has been sent and is awaiting approval
+            response_message = EmbedGenerator.default_embed(title="Invite Needs Approval", description=f"Your invitation of {member.display_name} to {team.name} needs approval. Please wait for approval.")
             await interaction.response.send_message(embed=response_message)
 
-            approval_embed = EmbedGenerator.default_embed(title="Invite Approval", description=f"Team: {team.name}\nInviter: {interaction.user.mention}\nInvitee: {player.mention}\nExpires: {expires_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            approval_embed = EmbedGenerator.default_embed(title="Invite Approval", description=f"Team: {team.name}\nInviter: {interaction.user.mention}\nInvitee: {member.mention}\nExpires: {expires_at.strftime('%Y-%m-%d %H:%M:%S')}")
             view = InviteApprovalView(invite.id)
             await mod_invite_channel.send(embed=approval_embed, view=view)
         else:
             await Invite.approve_status(session, invite.id, True)
             await session.commit()
-            response_message = EmbedGenerator.default_embed(title="Invite Sent", description=f"Invited {player.display_name} to your team.")
+            
+            # Notify interaction user that invite was sent
+            response_message = EmbedGenerator.default_embed(title="Invite Sent", description=f"Invited {member.display_name} to your team.")
             await interaction.response.send_message(embed=response_message)
-
+            
+            # Notify invitee that they have been invited
+            team_invitation_embed = EmbedGenerator.default_embed(title="Team Invitation", description=f"You have been invited to join **{team.name}** by {interaction.user.nick}.")  
+            await send_dm(interaction, member, team_invitation_embed)
+            
     @app_commands.command(name="invites", description="List all pending invites for your team")
     async def invites(self, interaction: discord.Interaction):
         async with AsyncSessionLocal() as session:
@@ -132,9 +140,9 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             await session.commit()
             
             if "Database updated" in message:
-                embed = EmbedGenerator.warning_embed(title="Invite Partially Accepted", description=f"You have joined {team.name} in the database, but: {message}")
+                embed = EmbedGenerator.warning_embed(title="Invite Partially Accepted", description=f"You have joined **{team.name}** in the database, but: {message}")
             else:
-                embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined {team.name}.")
+                embed = EmbedGenerator.success_embed(title="Invite Accepted", description=f"You have joined **{team.name}**.")
             
             await interaction.response.send_message(embed=embed)
 
@@ -194,9 +202,13 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="No valid invite found for this team."))
                 return
             
+            # Notify inviter that invite has been declined
+            denial_embed = EmbedGenerator.default_embed(title="Invite Declined", description=f"Your invitation of **{player.nickname}** to **{team.name}** has been declined by {player.nickname}.")
+            await send_dm(interaction, invite.inviter, denial_embed)
+            
             await Invite.decline_invite(session, invite.id)
             await session.commit()
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join {team.name}."))
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Invite Declined", description=f"You have declined the invitation to join **{team.name}**."))
 
     @app_commands.command(name="leave", description="Leave your current team")
     async def leave(self, interaction: discord.Interaction):
@@ -223,7 +235,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             if "Database updated" in message:
                 embed = EmbedGenerator.warning_embed(title="Leave Partially Successful", description=f"You have left the team in the database, but: {message}")
             else:
-                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left your team.")
+                embed = EmbedGenerator.success_embed(title="Team Left", description=f"You have left **{team.name}**.")
             
             await interaction.response.send_message(embed=embed)
             
@@ -253,7 +265,7 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
             team.captain_id = new_captain.discord_id
             await session.flush()
             
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Ownership Transferred", description=f"Transferred team ownership to {new_owner.display_name}."))
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Ownership Transferred", description=f"Transferred team ownership to {new_owner.mention}."))
 
     @app_commands.command(name="announce", description="Make an announcement to your team")
     async def announce(self, interaction: discord.Interaction, message: str):
