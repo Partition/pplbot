@@ -1,9 +1,10 @@
 import discord
 from models.invite import Invite
 from database import AsyncSessionLocal
-from models.player import Player, PlayerAlreadyInTeam
-from models.team import Team
 import re
+from typing import Dict, List
+from discord import app_commands
+from discord.ext import commands
 
 from utils.embed_gen import EmbedGenerator
 from utils.util_funcs import send_dm
@@ -80,3 +81,63 @@ class InviteApprovalView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(InviteApprovalButton(invite_id, True))
         self.add_item(InviteApprovalButton(invite_id, False))
+        
+class CategorySelect(discord.ui.Select):
+    def __init__(self, cogs: Dict[str, commands.Cog]):
+        self.cogs = cogs
+        self.selected_cog = None
+        options = [
+            discord.SelectOption(
+                label="General Category",
+                description="Contains general commands",
+                emoji="⚙️",
+                value="General"
+            ),
+            discord.SelectOption(
+                label="Account Category",
+                description="Contains account management commands",
+                emoji="👥",
+                value="AccountCog"
+            ),
+            discord.SelectOption(
+                label="Team Category",
+                description="Contains team management commands",
+                emoji="🏆",
+                value="TeamCog"
+            ),
+
+        ]
+        super().__init__(
+            placeholder="Select a category...",
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        self.selected_cog = self.values[0]
+        commands = [c for c in self.cogs[self.selected_cog].walk_app_commands()]
+        
+        if not commands:
+            embed = discord.Embed(
+                title=f"{self.selected_cog} Commands",
+                description="No commands found in this category.",
+                color=discord.Color.blue()
+            )
+        else:
+            embed = discord.Embed(
+                title=f"{self.selected_cog} Commands",
+                color=discord.Color.blue()
+            )
+            
+            for cmd in commands:
+                embed.add_field(
+                    name=f"/{cmd.name} {' '.join([f'`{p.name}`' for p in cmd.parameters]) if cmd.parameters else ''}",
+                    value=cmd.description or "No description available",
+                    inline=False
+                )
+
+        await interaction.response.edit_message(embed=embed)
+
+class HelpView(discord.ui.View):
+    def __init__(self, cogs: Dict[str, commands.Cog]):
+        super().__init__()
+        self.add_item(CategorySelect(cogs))

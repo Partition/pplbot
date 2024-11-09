@@ -10,47 +10,56 @@ from utils.embed_gen import EmbedGenerator
 from models.player import Player, PlayerDoesNotExist, PlayerAlreadyExists
 from models.team import Team
 from database import AsyncSessionLocal
-from config import REGISTERED_ROLE, NICKNAME_CHARACTER_LIMIT
+from config import REGISTERED_ROLE, NICKNAME_CHARACTER_LIMIT, GUILD_ID
 from random import choice
 from utils.enums import LeagueRole, TeamLeague
 from utils.util_funcs import get_discord_unix_timestamp_long, get_multi_opgg, get_opgg
 from utils.paginator import ButtonPaginator
+from utils.views import HelpView
 
 class General(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ping", description="Check the bot's latency")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def ping(self, interaction: discord.Interaction):
+        """Check the bot's latency.
+        """
         latency = round(self.bot.latency * 1000)
         await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Pong!", description=f"Latency: {latency}ms"))
 
-    @app_commands.command(name="coinflip", description="Toss a coin")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def coinflip(self, interaction: discord.Interaction):
+        """Toss a coin.
+        """
         flip = ["heads", "tails"]
         result = choice(flip)
-        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Cling!", description=f"The result is **{result}**"))
+        await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="Cling!", description=f"The result is **{result}**."))
 
-    @app_commands.command(name="register", description="Register to the database")
-    @app_commands.describe(role="The role of the player", nickname="The nickname of the player")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def register(self, interaction: discord.Interaction, role: LeagueRole, nickname: str = ""):
+        """Register to the database.
+        
+        Parameters:
+        role: LeagueRole
+            The role you play
+        nickname: str
+            The nickname you want to be known as
+        """
+        
+        if len(nickname) > NICKNAME_CHARACTER_LIMIT:
+               return await interaction.response.send_message(embed=EmbedGenerator.error_embed(
+                        title="Registration Failed",
+                        description=f"Your nickname cannot exceed 24 characters."
+                    )
+                )
+        
         async with AsyncSessionLocal() as session:
             if await Player.exists(session, interaction.user.id):
                return await interaction.response.send_message(
                     embed=EmbedGenerator.error_embed(
                         title="Registration Failed",
-                        description="You are already registered"
-                    )
-                )
-
-            if len(nickname) > NICKNAME_CHARACTER_LIMIT:
-               return await interaction.response.send_message(
-                    embed=EmbedGenerator.error_embed(
-                        title="Registration Failed",
-                        description=f"Your nickname cannot exceed 24 characters"
+                        description="You are already registered."
                     )
                 )
             new_player = await Player.create(
@@ -65,31 +74,30 @@ class General(commands.Cog):
             await interaction.user.add_roles(discord.Object(id=REGISTERED_ROLE), league_role)
             if nickname:
                 await interaction.user.edit(nick=nickname)
-
         except discord.Forbidden:
-            return await interaction.response.send_message(
+            oops_str = " (can't quite give you roles or change your nickname)"
+        finally:
+            await interaction.response.send_message(
                 embed=EmbedGenerator.success_embed(
-                    title="Registration Successful",
-                    description=f"Welcome, {new_player.nickname}! You have been registered."
+                title="Registration Successful",
+                description=f"Welcome, {new_player.nickname}! You have been registered{oops_str if oops_str else ''}. "
                 )
             )
 
-        await interaction.response.send_message(
-            embed=EmbedGenerator.success_embed(
-                title="Registration Successful",
-                description=f"Welcome, {new_player.nickname}! You have been registered."
-            )
-        )
-
-    @app_commands.command(name="nick", description="Change your nickname")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def nick(self, interaction: discord.Interaction, nickname: str = ""):
+        """Change your nickname.
+        
+        Parameters:
+        nickname: str
+            The nickname you want to change to
+        """
         async with AsyncSessionLocal() as session:
             if len(nickname) > NICKNAME_CHARACTER_LIMIT:
                return await interaction.response.send_message(
                     embed=EmbedGenerator.error_embed(
-                        title="Registration Failed",
-                        description=f"Your nickname cannot exceed 24 characters"
+                        title="Nickname Change Failed",
+                        description=f"Your nickname cannot exceed 24 characters."
                     )
                 )
 
@@ -102,39 +110,29 @@ class General(commands.Cog):
         try:
             await interaction.user.edit(nick=f"{team_tag}{nickname if nickname else interaction.user.name}")
         except discord.Forbidden:
-            pass
-
-        if nickname == "":
             await interaction.response.send_message(
-                embed=EmbedGenerator.default_embed(
-                    title="Nickname Cleared",
-                    description=f"Your nickname has been cleared"
+                embed=EmbedGenerator.error_embed(
+                    title="Nickname Change Failed",
+                    description="I don't have permission to change your nickname."
+                )
+            )
+        finally:
+            await interaction.response.send_message(
+                embed=EmbedGenerator.success_embed(
+                    title="Nickname Change Successful",
+                    description=f"{f'Your nickname has been cleared' if not nickname else f'Your nickname has been changed to {team_tag}{nickname}'}."
                 )
             )
 
-        else:
-            await interaction.response.send_message(
-                embed=EmbedGenerator.default_embed(
-                    title="Nickname Changed",
-                    description=f"Your nickname is now **{team_tag}{nickname}**"
-                )
-            )
 
-    @app_commands.command(name="team_check", description="Check your team")
-    @app_commands.guilds(911940380717617202)
-    async def team_check(self, interaction: discord.Interaction):
-        async with AsyncSessionLocal() as session:
-            team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
-        await interaction.response.send_message(
-            embed=EmbedGenerator.default_embed(
-                title="Your Team",
-                description=f"You are on the team {team.name}."
-            )
-        )
-
-    @app_commands.command(name="profile", description="View a profile")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
+        """View a profile.
+        
+        Parameters:
+        member: Optional[discord.Member]
+            The member you want to view the profile of (defaults to yourself)
+        """
         if not member:
             member = interaction.user
         async with AsyncSessionLocal() as session:
@@ -153,6 +151,7 @@ class General(commands.Cog):
                 captain_member = interaction.guild.get_member(captain.discord_id)
                 captain_mention = captain_member.mention if captain_member else "None"
                 team_tag = team.tag
+                team_league = team.league
 
             account_info = await Account.fetch_all_from_player_id(session, member.id)
             accounts_east = list()
@@ -168,30 +167,37 @@ class General(commands.Cog):
             description=f"**Discord: ** {member.mention}\n"
                         f"**Role: ** {player.role}\n\n"
                         f"**Team: ** {team_name}\n"
+                        f"**Team League: ** {team_league}\n"
                         f"**Team Captain: ** {captain_mention}\n"
                         f"**Team Tag: ** {team_tag}\n")
+        accounts_east_str_list = '\n'.join(f'[{x}]({get_opgg("euw", x)})' for x in accounts_east)
+        accounts_west_str_list = '\n'.join(f'[{x}]({get_opgg("euw", x)})' for x in accounts_west)
+        
         if accounts_east:
-            embed.add_field(name="",value=f"**Europe East ([All]({get_multi_opgg("eune",accounts_east)}))**\n"\
-                                     f"{"\n".join(f"[{x}]({get_opgg("eune", x)})" for x in accounts_east)}", inline=True)
+            embed.add_field(
+                name="",
+                value=f"**Europe East ([All]({get_multi_opgg('eune', accounts_east)}))**\n{accounts_east_str_list}",
+                inline=True
+            )
         if accounts_west:
-            embed.add_field(name="",value=f"**Europe West ([All]({get_multi_opgg("euw",accounts_west)}))**\n"\
-                                     f"{"\n".join(f"[{x}]({get_opgg("euw", x)})" for x in accounts_west)}", inline=True)
+            embed.add_field(
+                name="",
+                value=f"**Europe West ([All]({get_multi_opgg('euw', accounts_west)}))**\n{accounts_west_str_list}",
+                inline=True
+            )
 
         await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command()
+    async def help(self, interaction: discord.Interaction):
+        """View the help menu.
+        """
+        await interaction.response.send_message(view=HelpView(cogs=self.bot.cogs))
 
-    @app_commands.command(name="testpaginator", description="Test paginator")
-    @app_commands.guilds(911940380717617202)
-    async def testpaginator(self, interaction: discord.Interaction):
-        
-        # can iterate over Teams and create embeds for each team and append them to pages
-        pages = [EmbedGenerator.default_embed(title=f"Team A", description=f"Members: aaaa."),
-                 EmbedGenerator.default_embed(title=f"Team B", description=f"Members: bbbb.")]
-        paginator = ButtonPaginator(pages)
-        await paginator.start(interaction)
-
-    @app_commands.command(name="invites", description="View your active invites")
-    @app_commands.guilds(911940380717617202)
+    @app_commands.command()
     async def invites(self, interaction: discord.Interaction):
+        """View your active invites.
+        """
         async with AsyncSessionLocal() as session:
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
             if not player:
@@ -215,6 +221,31 @@ class General(commands.Cog):
             await paginator.start(interaction)
             return
         await interaction.response.send_message(embed=pages[0])
+    
+    # Some test commands for testing the bot
+    @app_commands.command()
+    async def team_check(self, interaction: discord.Interaction):
+        """Check your team.
+        """
+        async with AsyncSessionLocal() as session:
+            team = await Team.fetch_by_player_discord_id(session, interaction.user.id)
+        await interaction.response.send_message(
+            embed=EmbedGenerator.default_embed(
+                title="Your Team",
+                description=f"You are on the team {team.name}."
+            )
+        )
+    
+    @app_commands.command()
+    async def testpaginator(self, interaction: discord.Interaction):
+        """Test paginator.
+        """
+        # can iterate over Teams and create embeds for each team and append them to pages
+        pages = [EmbedGenerator.default_embed(title=f"Team A", description=f"Members: aaaa."),
+                 EmbedGenerator.default_embed(title=f"Team B", description=f"Members: bbbb.")]
+        paginator = ButtonPaginator(pages)
+        await paginator.start(interaction)
+        
         
 async def setup(bot):
-    await bot.add_cog(General(bot))
+    await bot.add_cog(General(bot), guild=discord.Object(id=GUILD_ID))
