@@ -46,7 +46,7 @@ class Transfer(Base):
     
     @classmethod
     async def fetch_all_team_transfers_from_team_id(cls, session: AsyncSession, team_id: int):
-        transfers = await session.execute(select(cls).where(cls.team_id == team_id))
+        transfers = await session.execute(select(cls).where(cls.team_id == team_id).order_by(cls.transfer_date.desc()))
         return transfers.scalars().all()
     
     @classmethod

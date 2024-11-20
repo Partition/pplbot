@@ -20,8 +20,8 @@ class Team(Base):
     __tablename__ = "teams_table"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, unique=True)
-    tag = Column(String(TAG_CHARACTER_LIMIT), unique=True)
+    name = Column(String)
+    tag = Column(String(TAG_CHARACTER_LIMIT))
     league = Column(String)
     captain_id = Column(BigInteger, ForeignKey("players_table.discord_id"), unique=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -51,13 +51,23 @@ class Team(Base):
     async def tag_exists(cls, session: AsyncSession, tag: str) -> bool:
         result = await session.execute(select(cls).where(cls.tag == tag))
         return result.scalars().first() is not None
+    
+    @classmethod
+    async def name_exists_and_active(cls, session: AsyncSession, name: str) -> bool:
+        result = await session.execute(select(cls).where(and_(cls.name == name, cls.active == True)))
+        return result.scalars().first() is not None
+    
+    @classmethod
+    async def tag_exists_and_active(cls, session: AsyncSession, tag: str) -> bool:
+        result = await session.execute(select(cls).where(and_(cls.tag == tag, cls.active == True)))
+        return result.scalars().first() is not None
 
     @classmethod
     async def create(cls, session: AsyncSession, name: str, tag: str, captain_id: int, league: str) -> "Team":
-        if await cls.name_exists(session, name):
+        if await cls.name_exists_and_active(session, name):
             raise TeamNameAlreadyExists(f"Team name '{name}' already exists")
         
-        if await cls.tag_exists(session, tag):
+        if await cls.tag_exists_and_active(session, tag):
             raise TeamTagAlreadyExists(f"Team tag '{tag}' already exists")
         
         team = cls(name=name, tag=tag, captain_id=captain_id, league=league)

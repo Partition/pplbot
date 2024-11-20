@@ -8,12 +8,11 @@ from models.invite import Invite
 from database import AsyncSessionLocal
 from utils.embed_gen import EmbedGenerator
 from datetime import datetime, timedelta
-from config import APPROVAL_REQUIRED, INVITE_CHANNEL
+from config import APPROVAL_REQUIRED, GUILD_ID, INVITE_CHANNEL
 from utils.paginator import ButtonPaginator
 from utils.util_funcs import get_discord_unix_timestamp_long, player_join_team, player_leave_team, send_dm
 from utils.views import InviteApprovalView
 
-@app_commands.guilds(911940380717617202)
 class TeamCog(commands.GroupCog, group_name="team", description="Team management commands"):
     def __init__(self, bot):
         self.bot = bot
@@ -27,8 +26,14 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 return False
         return True
 
-    @app_commands.command(name="invite", description="Invite a player to your team")
+    @app_commands.command()
     async def invite(self, interaction: discord.Interaction, member: discord.Member):
+        """Invite a player to your team.
+        
+        Parameters:
+        member: discord.Member
+            The player you want to invite to your team.
+        """
         async with AsyncSessionLocal() as session:
             inviter = await Player.fetch_from_discord_id(session, interaction.user.id)
             invitee = await Player.fetch_from_discord_id(session, member.id)
@@ -290,4 +295,4 @@ class TeamCog(commands.GroupCog, group_name="team", description="Team management
                 await interaction.response.send_message(embed=EmbedGenerator.default_embed(title="All Teams", description=team_list))
                 
 async def setup(bot):
-    await bot.add_cog(TeamCog(bot))
+    await bot.add_cog(TeamCog(bot), guilds=[discord.Object(id=GUILD_ID)])

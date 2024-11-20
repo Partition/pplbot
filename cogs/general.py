@@ -42,9 +42,9 @@ class General(commands.Cog):
         
         Parameters:
         role: LeagueRole
-            The role you play
+            The role you play.
         nickname: str
-            The nickname you want to be known as
+            The nickname you want to be known as.
         """
         
         if len(nickname) > NICKNAME_CHARACTER_LIMIT:
@@ -90,13 +90,13 @@ class General(commands.Cog):
         
         Parameters:
         nickname: str
-            The nickname you want to change to
+            The nickname you want to change to.
         """
         async with AsyncSessionLocal() as session:
             if len(nickname) > NICKNAME_CHARACTER_LIMIT:
                return await interaction.response.send_message(
                     embed=EmbedGenerator.error_embed(
-                        title="Nickname Change Failed",
+                        title="Nickname Update Failed",
                         description=f"Your nickname cannot exceed 24 characters."
                     )
                 )
@@ -112,15 +112,15 @@ class General(commands.Cog):
         except discord.Forbidden:
             await interaction.response.send_message(
                 embed=EmbedGenerator.error_embed(
-                    title="Nickname Change Failed",
+                    title="Nickname Update Failed",
                     description="I don't have permission to change your nickname."
                 )
             )
         finally:
             await interaction.response.send_message(
                 embed=EmbedGenerator.success_embed(
-                    title="Nickname Change Successful",
-                    description=f"{f'Your nickname has been cleared' if not nickname else f'Your nickname has been changed to {team_tag}{nickname}'}."
+                    title="Nickname Updated",
+                    description=f"{f'Your nickname has been cleared' if not nickname else f'Your nickname has been changed to [{team_tag}]{nickname}'}"
                 )
             )
 
@@ -131,7 +131,7 @@ class General(commands.Cog):
         
         Parameters:
         member: Optional[discord.Member]
-            The member you want to view the profile of (defaults to yourself)
+            The member you want to view the profile of (defaults to yourself).
         """
         if not member:
             member = interaction.user
@@ -139,7 +139,9 @@ class General(commands.Cog):
             player = await Player.fetch_from_discord_id(session, member.id)
             if not player:
                 return await interaction.response.send_message(embed=EmbedGenerator.error_embed(
-                    title=f"Profile - {member.name}",description="This player is not registered"))
+                    title=f"Profile - {member.name}",
+                    description="This player is not registered."
+                ))
 
             team = await Team.fetch_by_player_discord_id(session, player.discord_id)
             team_name = "None"
@@ -202,19 +204,21 @@ class General(commands.Cog):
             player = await Player.fetch_from_discord_id(session, interaction.user.id)
             if not player:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(
-                    title="Invites",description="You need to be registered to view your invites"))
+                    title="Registration Required",
+                    description="You need to be registered to view your invites"))
                 return
-            active_invites = await Invite.fetch_active_invites_by_invitee(session, player.discord_id)
             
+            active_invites = await Invite.fetch_active_invites_by_invitee(session, player.discord_id)
             if not active_invites:
                 await interaction.response.send_message(embed=EmbedGenerator.error_embed(
-                    title="Invites",description="You have no active invites"))
+                    title="No Active Invites",
+                    description="You have no active invites"))
                 return
             
         per_page = 5
         amount_of_pages = math.ceil(len(active_invites) / per_page)
         pages = [EmbedGenerator.default_embed(
-                title=f"Invite list - {player.nickname}", 
+                title=f"Active Invites - {player.nickname}", 
                 description="\n".join([f"- <@{invite.team_id}> (Expires: {get_discord_unix_timestamp_long(invite.expires_at)})" for invite in active_invites[i*per_page:(i+1)*per_page]])) for i in range(amount_of_pages)]
         if amount_of_pages > 1:
             paginator = ButtonPaginator(pages)
@@ -248,4 +252,4 @@ class General(commands.Cog):
         
         
 async def setup(bot):
-    await bot.add_cog(General(bot), guild=discord.Object(id=GUILD_ID))
+    await bot.add_cog(General(bot), guilds=[discord.Object(id=GUILD_ID)])

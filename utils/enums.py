@@ -33,10 +33,11 @@ class TeamLeague(Enum):
     Prime = "Prime"
     Surrogate = "Surrogate"
     Trine = "Trine"
+    Unranked = "Unranked"
 
 class TransferType(Enum):
+    PLAYER_LEAVE = 0
     PLAYER_JOIN = 1
-    PLAYER_LEAVE = 2
-    TEAM_CREATE = 3
-    TEAM_DISBAND = 4
+    TEAM_CREATE = 2
+    TEAM_DISBAND = 3
     
