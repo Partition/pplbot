@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from models.player import Player, PlayerDoesNotExist
+from models.player import Player
 from utils.embed_gen import EmbedGenerator
 from database import AsyncSessionLocal
 from utils.views import ConfirmView
@@ -10,8 +10,8 @@ from models.account import Account
 from random import choice
 from datetime import datetime
 from utils.enums import LeagueServer, LeagueTier, LeagueRank
+from config import GUILD_ID
 
-@app_commands.guilds(911940380717617202)
 class AccountCog(commands.GroupCog, group_name="account", description="Account management commands"):
     def __init__(self, bot):
         self.bot = bot
@@ -24,10 +24,18 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
                 return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description="You are not registered, please use the /register command"), ephemeral=True)
         return True
     
-    @app_commands.command(name="add", description="Add an account to the database")
-    @app_commands.describe(username="The username of the account", tag="The tag of the account", server="The server of the account")
+    @app_commands.command()
     async def add(self, interaction: discord.Interaction, username: str, tag: str, server: LeagueServer):
+        """Add an account to the database.
         
+        Parameters
+        username: str
+            The username of the account.
+        tag: str
+            The tag of the account.
+        server: LeagueServer
+            The server of the account.
+        """
         # Check if the account already exists in database
         async with AsyncSessionLocal() as session:
             if await Account.check_if_username_and_tag_exists(session, username, tag, LeagueServer(server.value).name):
@@ -53,14 +61,14 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
         view = ConfirmView()
         await interaction.response.send_message(
             view=view,
-            embed=EmbedGenerator.default_embed(title="Change account icon", description="Change the account's profile icon to the one shown to confirm ownership").set_thumbnail(url=url),
+            embed=EmbedGenerator.default_embed(title="Confirm Account Ownership", description="Change the account's profile icon to the one shown to confirm ownership.").set_thumbnail(url=url),
             ephemeral=True
         )
         await view.wait()
 
         # if/else creates the embed based on the view value
         if view.value is None or not view.value:
-            new_embed = EmbedGenerator.error_embed(title="Error", description="You must confirm to change the account icon")
+            new_embed = EmbedGenerator.error_embed(title="Account Icon Change Failed", description="You must confirm to change the account icon.")
         else:
             # Fetch the account info again to compare the profile icon with the random one
             updated_account, updated_summoner, updated_ranked = await get_account_info(username, tag, server.value)
@@ -95,19 +103,21 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
                 account = await Account.create(session=session, **account_data)
                 await session.commit()
 
-            new_embed = EmbedGenerator.success_embed(title="Success", description="Account successfully added to the database")
+            new_embed = EmbedGenerator.success_embed(title="Account Added", description="Account successfully added to the database.")
             
         await interaction.edit_original_response(embed=new_embed, view=None)
 
-    @app_commands.command(name="update", description="Update all your registered accounts")
+    @app_commands.command()
     async def update(self, interaction: discord.Interaction):
+        """Update all of your registered accounts.
+        """
         await interaction.response.defer(ephemeral=True)
         
         async with AsyncSessionLocal() as session:
             accounts = await Account.fetch_all_from_player_id(session, interaction.user.id)
             
             if not accounts:
-                return await interaction.followup.send(embed=EmbedGenerator.error_embed(title="Error", description="You don't have any registered accounts to update."))
+                return await interaction.followup.send(embed=EmbedGenerator.error_embed(title="No accounts", description="You don't have any registered accounts to update."))
             
             updated_count = 0
             for account in accounts:
@@ -156,4 +166,4 @@ class AccountCog(commands.GroupCog, group_name="account", description="Account m
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(AccountCog(bot))
+    await bot.add_cog(AccountCog(bot), guilds=[discord.Object(id=GUILD_ID)])
