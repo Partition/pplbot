@@ -17,7 +17,12 @@ engine = create_async_engine(
     max_overflow=15,          # Maximum number of connections above pool_size
     pool_timeout=30,          # Seconds to wait before timing out on pool get
     pool_recycle=1800,        # Recycle connections after 30 minutes
-    pool_pre_ping=True        # Enable connection health checks
+    pool_pre_ping=True,       # Enable connection health checks
+    # Add these connection arguments for Supabase compatibility
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0
+    }
 )
 
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
