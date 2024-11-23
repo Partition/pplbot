@@ -55,7 +55,8 @@ class Admin(commands.Cog):
                 if len(tag) > TAG_CHARACTER_LIMIT:
                     return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"Tag must be less than {TAG_CHARACTER_LIMIT} characters."))
                 
-                team = await Team.create(session, name, tag, player.discord_id, league.value)
+                league = league.value if league else None
+                team = await Team.create(session, name, tag, player.discord_id, league)
                 await interaction.guild.create_role(name=name, hoist=True, mentionable=True, reason="Team created by " + interaction.user.name)
                 
                 success, message = await player_join_team(session, interaction, player, team, TransferType.TEAM_CREATE)
@@ -63,7 +64,7 @@ class Admin(commands.Cog):
                     return await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=message))
                 await session.commit()
             
-            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Created", description=f"Successfully created **{name} ({tag})** [{league.value}]"))
+            await interaction.response.send_message(embed=EmbedGenerator.success_embed(title="Team Created", description=f"Successfully created **{name} ({tag})** [{league}]"))
         except TeamNameAlreadyExists:
             await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=f"A team with the name '{name}' already exists."))
         except TeamTagAlreadyExists:
@@ -119,6 +120,7 @@ class Admin(commands.Cog):
     @app_commands.describe(search_term="The tag or name of the team")
     @app_commands.guilds(911940380717617202)
     async def archive(self, interaction: discord.Interaction, search_term: str):
+        await interaction.response.defer()
         async with AsyncSessionLocal() as session:
             teams = await Team.search_by_name_or_tag_in_league(session, search_term)
             if not teams:
@@ -127,7 +129,7 @@ class Admin(commands.Cog):
             
             # Confirm with the user
             confirm_view = ConfirmView()
-            await interaction.response.send_message(
+            view_msg = await interaction.followup.send(
                 view=confirm_view,
                 embed=EmbedGenerator.default_embed(title="Archive Team", description=f"Are you sure you want to archive team **{team.name} ({team.tag})**? This action cannot be undone."),
             )
@@ -135,7 +137,7 @@ class Admin(commands.Cog):
             # Wait for user confirmation
             await confirm_view.wait()
             if confirm_view.value is None or not confirm_view.value:
-                return await interaction.edit_original_response(embed=EmbedGenerator.error_embed(title="Failed", description="Action cancelled by user."), view=None)
+                return await interaction.followup.edit_message(view_msg.id, embed=EmbedGenerator.error_embed(title="Archive Team", description="Action cancelled by user."), view=None)
             
             category_channel = discord.utils.get(interaction.guild.categories, name=team.name)
             if category_channel:
@@ -159,7 +161,7 @@ class Admin(commands.Cog):
                 
             await Team.archive(session, team.id)
             await session.commit()
-            await interaction.edit_original_response(embed=EmbedGenerator.success_embed(title="Team Archived", description=f"Successfully archived team **{team.name} ({team.tag})**. All related channels have been deleted."),
+            await interaction.followup.edit_message(view_msg.id, embed=EmbedGenerator.success_embed(title="Team Archived", description=f"Successfully archived team **{team.name} ({team.tag})**. All related channels have been deleted."),
                                                      view=None)
     @app_commands.command()
     @commands.has_permissions(administrator=True)

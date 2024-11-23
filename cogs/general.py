@@ -142,18 +142,23 @@ class General(commands.Cog):
                     title=f"Profile - {member.name}",
                     description="This player is not registered."
                 ))
-
+                
+            # Fetch the player's team data
             team = await Team.fetch_by_player_discord_id(session, player.discord_id)
-            team_name = "None"
-            team_tag = "None"
-            captain_mention = "None"
+            captain = await Player.fetch_from_discord_id(session, team.captain_id) if team else None
+            captain_member = interaction.guild.get_member(captain.discord_id) if captain else None
+            team_name = team.name if team else "None"
+            captain_mention = captain_member.mention if captain_member else "None"
+            team_tag = team.tag if team else "None"
+            team_league = team.league if team else "None"
+            
+            # If the player is on a team, add the team info to the embed
             if team:
-                team_name = team.name
-                captain = await Player.fetch_from_discord_id(session, team.captain_id)
-                captain_member = interaction.guild.get_member(captain.discord_id)
-                captain_mention = captain_member.mention if captain_member else "None"
-                team_tag = team.tag
-                team_league = team.league
+                team_str = f"**Team: ** {team_name} [{team_tag}]\n"
+                team_str += f"**Team Captain: ** {captain_mention}\n"
+                team_str += f"**Team League: ** {team_league}\n"
+            else:
+                team_str = ""
 
             account_info = await Account.fetch_all_from_player_id(session, member.id)
             accounts_east = list()
@@ -168,10 +173,7 @@ class General(commands.Cog):
             title=f"Profile - {member.name}",
             description=f"**Discord: ** {member.mention}\n"
                         f"**Role: ** {player.role}\n\n"
-                        f"**Team: ** {team_name}\n"
-                        f"**Team League: ** {team_league}\n"
-                        f"**Team Captain: ** {captain_mention}\n"
-                        f"**Team Tag: ** {team_tag}\n")
+                        f"{team_str}")
         accounts_east_str_list = '\n'.join(f'[{x}]({get_opgg("euw", x)})' for x in accounts_east)
         accounts_west_str_list = '\n'.join(f'[{x}]({get_opgg("euw", x)})' for x in accounts_west)
         
