@@ -72,6 +72,7 @@ class General(commands.Cog):
         try:
             league_role = discord.utils.get(interaction.guild.roles, name=role.value)
             await interaction.user.add_roles(discord.Object(id=REGISTERED_ROLE), league_role)
+            oops_str = ""
             if nickname:
                 await interaction.user.edit(nick=nickname)
         except discord.Forbidden:
@@ -120,7 +121,7 @@ class General(commands.Cog):
             await interaction.response.send_message(
                 embed=EmbedGenerator.success_embed(
                     title="Nickname Updated",
-                    description=f"{f'Your nickname has been cleared' if not nickname else f'Your nickname has been changed to [{team_tag}]{nickname}'}"
+                    description=f"{f'Your nickname has been cleared' if not nickname else f'Your nickname has been changed to {team_tag}{nickname}'}."
                 )
             )
 
@@ -221,7 +222,7 @@ class General(commands.Cog):
         amount_of_pages = math.ceil(len(active_invites) / per_page)
         pages = [EmbedGenerator.default_embed(
                 title=f"Active Invites - {player.nickname}", 
-                description="\n".join([f"- <@{invite.team_id}> (Expires: {get_discord_unix_timestamp_long(invite.expires_at)})" for invite in active_invites[i*per_page:(i+1)*per_page]])) for i in range(amount_of_pages)]
+                description="\n".join([f"- <@{invite.inviter_id}> (Expires: {get_discord_unix_timestamp_long(invite.expires_at)})" for invite in active_invites[i*per_page:(i+1)*per_page]])) for i in range(amount_of_pages)]
         if amount_of_pages > 1:
             paginator = ButtonPaginator(pages)
             await paginator.start(interaction)
