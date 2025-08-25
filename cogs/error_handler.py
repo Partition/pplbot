@@ -7,7 +7,6 @@ from config import BOT_CHANNEL
 class ErrorHandler(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        print("ErrorHandler cog loaded")
         
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
@@ -42,3 +41,7 @@ class ErrorHandler(commands.Cog):
         
         await interaction.response.send_message(embed=EmbedGenerator.error_embed(title="Error", description=error_message), ephemeral=True)
         logging.error(f"Slash command error: {error}")
+        
+async def setup(bot):
+    await bot.add_cog(ErrorHandler(bot))
+

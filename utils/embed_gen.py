@@ -2,11 +2,12 @@ import discord
 
 class EmbedGenerator:
     @staticmethod
-    def default_embed(title: str, description: str) -> discord.Embed:
+    def default_embed(title: str, description: str, url: str = None) -> discord.Embed:
         return discord.Embed(
             title=title,
             description=description,
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
+            url=url
         )
 
     @staticmethod
@@ -15,6 +16,14 @@ class EmbedGenerator:
             title=title,
             description=description,
             color=discord.Color.green()
+        )
+        
+    @staticmethod
+    def warning_embed(title: str, description: str) -> discord.Embed:
+        return discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color.orange()
         )
 
     @staticmethod
